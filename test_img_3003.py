@@ -1,4 +1,5 @@
 import cv2
+import random
 import numpy as np
 from tqdm import tqdm
 from pathlib import Path
@@ -16,11 +17,19 @@ def main():
 
     img1 = imu.get_image_area(img1, (50, 50, 200, 200))
 
-    files = [str(f) for f in Path('./images/3003').glob('*.png')]
+    files = []
+    for d in ['3003', '3070', '3700']:
+        files.extend([str(f) for f in Path(f'./images/{d}/').glob('*.png')])
+    print(f'{len(files)} files loaded')
+
     scores = []
     pipe2 = imu.Pipe() | imu.LoadFile(None) | imu.Resize((256,256)) | imu.Area((50,70,200,220))
 
-    for f in tqdm(files):
+    # file_subset = random.sample(files, 10)
+    file_subset = files
+
+    for f in (pbar := tqdm(file_subset)):
+        pbar.set_description(Path(f).name)
         pipe2[imu.LoadFile].filename = f
         img2 = pipe2(None)
         # imshow(img2, f)

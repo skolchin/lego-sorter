@@ -2,9 +2,16 @@
 # Model training (TF-dataset version)
 # (c) kol, 2022
 
-import click
 import matplotlib.pyplot as plt
-from model import make_model, load_model, checkpoint_callback, CHECKPOINT_DIR
+from absl import app
+from absl import flags
+
+from model import (
+    make_model, 
+    load_model, 
+    checkpoint_callback, 
+    cleanup_callbacks
+)
 
 from image_dataset import (
     load_dataset, 
@@ -22,47 +29,50 @@ def plot_history(history):
         axs[i].legend(['train', 'val'], loc='upper left')
     plt.show()
 
-@click.command()
-@click.option('--epoch', '-n', 'num_epoch', type=int, default=30, show_default=True,
+FLAGS = flags.FLAGS
+flags.DEFINE_integer('epoch', default=30, lower_bound=1, short_name='n',
     help='Number of epoch to train model for')
-@click.option('--show/--no-show', 'show_images', is_flag=True, default=True, show_default=True,
-    help='Show image samples and plots')
-@click.option('--save/--no-save', 'save_model', is_flag=True, default=True, show_default=True,
-    help='Save model to disk')
-@click.option('--gray', '-g', '--grayscale', 'use_grayscale', is_flag=True, default=False, show_default=True,
-    help='Convert images to grayscale')
-def main(show_images: bool, save_model: bool, num_epoch: int, use_grayscale: bool):
+flags.DEFINE_boolean('show', default=True, help='Show image samples and plots')
+flags.DEFINE_boolean('save', default=True, help='Save model to disk')
+flags.DEFINE_boolean('gray', default=False, short_name='g', 
+    help='Train on grayscale images')
+
+def main(argv):
     """ Train the LEGO Sorter model """
 
-    image_data = load_dataset(use_grayscale=use_grayscale)
-    if show_images:
-        show_samples(image_data)
-
+    image_data = load_dataset(use_grayscale=FLAGS.gray)
+    if FLAGS.show:
+        show_samples(image_data.tfds, image_data.class_names)
+ 
     num_labels = len(image_data.class_names)
     train_data, test_data = split_dataset(image_data)
 
-    model = make_model(num_labels, use_grayscale=use_grayscale)
+    model = make_model(num_labels, use_grayscale=FLAGS.gray)
     print('\nModel summary:\n---')
     model.summary()
 
-    if not save_model:
+    if not FLAGS.save:
         callbacks_list = []
     else:
         callbacks_list = [checkpoint_callback()]
         load_model(model)
 
-    history = model.fit(train_data, validation_data=test_data, epochs=num_epoch,
+    history = model.fit(
+        train_data, 
+        validation_data=test_data, 
+        epochs=FLAGS.epoch,
         callbacks=callbacks_list)
 
-    if show_images:
+    if FLAGS.save:
+        cleanup_callbacks()
+
+    if FLAGS.show:
         plot_history(history)
+        show_prediction_samples(model, test_data, image_data.class_names, use_grayscale=FLAGS.gray)
 
     # metrics = model.evaluate(test_data)
     # print(f'\nEvaluation metrics:\n---') 
     # print('\n'.join([f'{m}={v:.4%}' for m, v in zip(model.metrics_names, metrics)]))
 
-    if show_images:
-        show_prediction_samples(model, image_data, use_grayscale=use_grayscale)
-
 if __name__ == '__main__':
-    main()
+    app.run(main)
