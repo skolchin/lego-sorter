@@ -5,29 +5,28 @@ from tqdm import tqdm
 from pathlib import Path
 import img_utils22 as imu
 
-def imshow(img, title='debug'):
-    if img is not None:
-        cv2.imshow(title, img)
-        cv2.waitKey(0)
-
 def main():
-    pipe = imu.Pipe() | imu.LoadFile('./out/3003_test.png') | imu.Resize((256,256))
+    pipe = imu.Pipe() | imu.LoadFile('./out/3003_test.png') \
+        | imu.ExtractObjects(bgcolor=255) | imu.ShowImage('image1') #| imu.Resize((256,256))
     img1 = pipe(None)
-    imshow(img1, 'image1')
 
-    img1 = imu.get_image_area(img1, (50, 50, 200, 200))
+    # pipe = imu.Pipe() | imu.LoadFile('./images/3003/3003_1840.png') \
+    #     | imu.EqualizeLuminosity() | imu.ExtractObjects(bgcolor=237) #| imu.Resize((256,256))
+    # img2 = pipe(None)
+    # imshow(img2, 'image2')
+
+    # return
 
     files = []
-    for d in ['3003', '3070', '3700']:
+    for d in ['3003', '3070', '3004']:
         files.extend([str(f) for f in Path(f'./images/{d}/').glob('*.png')])
     print(f'{len(files)} files loaded')
 
     scores = []
-    pipe2 = imu.Pipe() | imu.LoadFile(None) | imu.Resize((256,256)) | imu.Area((50,70,200,220))
+    pipe2 = imu.Pipe() | imu.LoadFile(None) | imu.ExtractObjects(bgcolor=237) #| imu.Resize((256,256))
 
     # file_subset = random.sample(files, 10)
     file_subset = files
-
     for f in (pbar := tqdm(file_subset)):
         pbar.set_description(Path(f).name)
         pipe2[imu.LoadFile].filename = f
@@ -41,12 +40,12 @@ def main():
             scores.append(0)
 
     max_score_idx = np.argmax(scores)
-    fn, score = files[max_score_idx], scores[max_score_idx]
-    print(f'Max similarity score {score} is for {fn}')
+    fn, score = file_subset[max_score_idx], scores[max_score_idx]
+    print(f'Max similarity score {score} detected on {fn}')
 
     pipe[imu.LoadFile].filename = fn
     max_score_img = pipe(None)
-    imshow(max_score_img, Path(fn).name)
+    imu.ShowImage()(max_score_img, Path(fn).name)
 
 if __name__ == '__main__':
     try:
