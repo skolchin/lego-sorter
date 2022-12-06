@@ -3,8 +3,8 @@
 # (c) kol, 2022
 
 import matplotlib.pyplot as plt
-from absl import app
-from absl import flags
+from absl import app, flags
+import global_flags
 
 from model import (
     make_model, 
@@ -34,20 +34,19 @@ flags.DEFINE_integer('epoch', default=30, lower_bound=1, short_name='n',
     help='Number of epoch to train model for')
 flags.DEFINE_boolean('show', default=True, help='Show image samples and plots')
 flags.DEFINE_boolean('save', default=True, help='Save model to disk')
-flags.DEFINE_boolean('gray', default=False, short_name='g', 
-    help='Train on grayscale images')
+flags.declare_key_flag('gray')
 
 def main(argv):
     """ Train the LEGO Sorter model """
 
-    image_data = load_dataset(use_grayscale=FLAGS.gray)
+    image_data = load_dataset()
     if FLAGS.show:
         show_samples(image_data.tfds, image_data.class_names)
  
     num_labels = len(image_data.class_names)
     train_data, test_data = split_dataset(image_data)
 
-    model = make_model(num_labels, use_grayscale=FLAGS.gray)
+    model = make_model(num_labels)
     print('\nModel summary:\n---')
     model.summary()
 
@@ -68,7 +67,7 @@ def main(argv):
 
     if FLAGS.show:
         plot_history(history)
-        show_prediction_samples(model, test_data, image_data.class_names, use_grayscale=FLAGS.gray)
+        show_prediction_samples(model, test_data, image_data.class_names)
 
     # metrics = model.evaluate(test_data)
     # print(f'\nEvaluation metrics:\n---') 

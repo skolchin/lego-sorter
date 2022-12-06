@@ -6,23 +6,33 @@ import os
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+from absl import flags
 from keras.utils import image_dataset_from_directory
 from collections import namedtuple
 from typing import Tuple, Iterable, Union
 
+import global_flags
 from model import BATCH_SIZE, IMAGE_SIZE, preprocess_input
 
 IMAGE_DIR = os.path.join(os.path.split(__file__)[0], 'images')
+""" Images root"""
 
 ImageDataset = namedtuple('ImageDataset', ['tfds', 'num_files', 'class_names'])
+""" Image dataset wrapper """
 
-def load_dataset(use_grayscale: bool = False) -> ImageDataset:
-    """ Load images as TF dataset """
+def _preprocess(images, labels=None):
+    result = preprocess_input(images)
+    if flags.FLAGS.gray:
+        result = tf.image.rgb_to_grayscale(result)
+    return result, labels
+
+def load_dataset() -> ImageDataset:
+    """ Load images as dataset """
     seed = np.random.randint(1e6)
     ds = image_dataset_from_directory(
         IMAGE_DIR,
         label_mode='categorical',
-        color_mode='grayscale' if use_grayscale else 'rgb',
+        color_mode='grayscale' if flags.FLAGS.gray else 'rgb',
         batch_size=None,
         image_size=IMAGE_SIZE,
         shuffle=False,
@@ -31,13 +41,15 @@ def load_dataset(use_grayscale: bool = False) -> ImageDataset:
     )
     num_files = len(ds.file_paths)
     return ImageDataset(
-        ds.shuffle(buffer_size=int(num_files/4), reshuffle_each_iteration=False, seed=seed).batch(BATCH_SIZE), 
+        ds.shuffle(buffer_size=int(num_files/4), reshuffle_each_iteration=False, seed=seed) \
+            .map(_preprocess) \
+            .batch(BATCH_SIZE), 
         num_files,
         ds.class_names.copy()
     )
 
 def split_dataset(ids: ImageDataset, split_by: float=0.8) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
-    """ Split TF dataset into train/test subsets """
+    """ Split dataset into train/test TF subsets """
     train_size = int(ids.num_files * split_by / BATCH_SIZE)
     train_ds = ids.tfds.take(train_size)
     test_ds = ids.tfds.skip(train_size)
@@ -68,18 +80,13 @@ def predict_image(
     model: tf.keras.Model, 
     file_name: str, 
     class_names: Iterable[str], 
-    true_label: str = None, 
-    use_grayscale: bool = False):
+    true_label: str = None):
     """ Run a pretrained model prediction on given image file """
 
     image = tf.keras.utils.load_img(file_name, target_size=IMAGE_SIZE, 
                                     interpolation='bicubic', keep_aspect_ratio=False)
     image = tf.keras.utils.img_to_array(image)
-    if not use_grayscale:
-        prepared_image = preprocess_input(np.array([image]))
-    else:
-        prepared_image = preprocess_input(np.array([image]))
-        prepared_image = tf.image.rgb_to_grayscale(prepared_image).numpy()
+    prepared_image, _ = _preprocess(np.array([image]), None)
 
     prediction = model.predict(prepared_image)
     most_likely = np.argmax(prediction)
@@ -95,8 +102,7 @@ def show_prediction_samples(
     model: tf.keras.Model, 
     tfds: tf.data.Dataset,
     class_names: Iterable[str],
-    num_samples: int = 9, 
-    use_grayscale: bool = False):
+    num_samples: int = 9):
     """ Show prediction samples from test dataset """
     
     plt.figure(figsize=(8, 8))
@@ -104,16 +110,8 @@ def show_prediction_samples(
         for i in range(num_samples):
             _ = plt.subplot(int(num_samples/3), int(num_samples/3), i + 1)
             label = class_names[np.argmax(labels[i])]
-
-            if use_grayscale:
-                image = tf.image.grayscale_to_rgb(images[i]).numpy()
-                prepared_image = preprocess_input(np.array([image]))
-                prepared_image = tf.image.rgb_to_grayscale(prepared_image).numpy()
-            else:
-                image = images[i].numpy()
-                prepared_image = preprocess_input(np.array([image]))
-
-            prediction = model.predict(prepared_image)
+            image = images[i].numpy()
+            prediction = model.predict(np.array([image]))
             most_likely = np.argmax(prediction)
             predicted_label = class_names[most_likely]
             predicted_prob = prediction[0][most_likely]
@@ -124,35 +122,18 @@ def show_prediction_samples(
     plt.show()
 
 def filter_dataset_by_label(tfds: tf.data.Dataset, class_names: Iterable[str], label: str) -> tf.data.Dataset:
-    """ Return a dataset subset containing images of given label only """
+    """ Return a TF dataset subset containing images of given label only """
     label_index = class_names.index(label)
     return tfds.unbatch().filter(lambda _, label: tf.equal(tf.math.argmax(label), label_index)).batch(BATCH_SIZE)
 
-def get_predictions(
-    model: tf.keras.Model, 
-    tfds: tf.data.Dataset,
-    class_names: Iterable[str],
-    use_grayscale: bool = False,
-    return_images: bool = False) -> Union[np.array, Tuple[np.array, np.array]]:
-    """ Get predictions for dataset """
+def get_predictions(model: tf.keras.Model, tfds: tf.data.Dataset) -> Tuple[tf.Tensor, tf.Tensor]:
+    """ Get predictions for TF dataset """
 
-    ret_pred = []
-    ret_images = []
-    for images, labels in tfds:
-        if use_grayscale:
-            images = tf.image.grayscale_to_rgb(images)
-            prepared_images = preprocess_input(images.numpy())
-            prepared_images = tf.image.rgb_to_grayscale(prepared_images).numpy()
-        else:
-            prepared_images = preprocess_input(images.numpy())
+    true_labels = [tf.argmax(labels) for _, labels in tfds.unbatch()]
+    true_labels = tf.stack(true_labels, axis=0)
 
-        predictions = model.predict(prepared_images)
-        for image, label, prediction in zip(images, labels, predictions):
-            most_likely = np.argmax(prediction)
-            predicted_label = class_names[most_likely]
-            predicted_prob = prediction[0][most_likely]
-            ret_pred.append([label, predicted_label, predicted_prob])
-            if return_images:
-                ret_images.append(image)
+    predicted_labels = model.predict(tfds)
+    predicted_labels = tf.concat(predicted_labels, axis=0)
+    predicted_labels = tf.argmax(predicted_labels, axis=1)
 
-    return (np.array(ret_pred), np.array(ret_images)) if return_images else np.array(ret_pred)
+    return true_labels, predicted_labels

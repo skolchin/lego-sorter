@@ -66,11 +66,14 @@ def make_model(num_labels: int, use_grayscale: bool = False) -> tf.keras.Model:
     model.build([None] + list(input_shape))
     return model
 
+def _checkpoint_subdir():
+    return 'gray' if FLAGS.gray else 'color'
+
 def checkpoint_callback():
     """ Build a callback to save model weigth checkpoints while fitting a model """
 
     return tf.keras.callbacks.ModelCheckpoint(
-        filepath=os.path.join(CHECKPOINT_DIR, 'cp-{epoch:04d}.ckpt'),
+        filepath=os.path.join(CHECKPOINT_DIR, _checkpoint_subdir(), 'cp-{epoch:04d}.ckpt'),
         save_weights_only=True,
         monitor='val_accuracy',
         mode='max',
@@ -80,7 +83,7 @@ def checkpoint_callback():
 def load_model(model: tf.keras.Model) -> tf.keras.Model:
     """ Load a model weights from latest checkpoint """
 
-    cp_path = tf.train.latest_checkpoint(CHECKPOINT_DIR)
+    cp_path = tf.train.latest_checkpoint(os.path.join(CHECKPOINT_DIR, _checkpoint_subdir()))
     if not cp_path:
         print('WARNING: no checkpoints found while loading the model')
     else:
@@ -92,12 +95,14 @@ def load_model(model: tf.keras.Model) -> tf.keras.Model:
 def cleanup_callbacks(keep: int = 3):
     """ Clean up abundant checkpoints after model.fit() run with checkpoint-saving callback """
     import re
-    files = [fn for fn in os.listdir(CHECKPOINT_DIR) if fn.startswith('cp-')]
+    
+    chkpt_path = os.path.join(CHECKPOINT_DIR, _checkpoint_subdir())
+    files = [fn for fn in os.listdir(chkpt_path) if fn.startswith('cp-')]
     file_idx = [int(re.search('\\d+', fn).group(0)) for fn in files]
 
     max_idx = max(file_idx) - keep
     if max_idx > 0:
         for fn, idx in zip(files, file_idx):
             if idx < max_idx:
-                os.remove(os.path.join(CHECKPOINT_DIR, fn))
+                os.remove(os.path.join(chkpt_path, fn))
 

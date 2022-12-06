@@ -1,2 +1,4 @@
 tensorflow==2.10
 opencv>=4.0.0
+matplotlib
+seaborn
