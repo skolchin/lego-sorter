@@ -5,6 +5,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from absl import app, flags
 
 from image_dataset import (
     load_dataset, 
@@ -45,6 +46,7 @@ def main():
     label_diff = set(test_labels).difference(train_labels)
     if label_diff:
         print(f'Labels only in test: {label_diff}')
+        
     label_diff = set(train_labels).difference(test_labels)
     if label_diff:
         print(f'Labels only in train: {label_diff}')
@@ -55,4 +57,4 @@ def main():
     print(group_var_mean)
 
 if __name__ == '__main__':
-    main()
+    app(main)

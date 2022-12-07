@@ -1,3 +1,7 @@
+# LEGO sorter project
+# Pipeline tests - probably should be moved to img_utils22?
+# (c) kol, 2022
+
 import cv2
 import numpy as np
 import img_utils22 as imu

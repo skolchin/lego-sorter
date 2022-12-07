@@ -1,4 +1,4 @@
-tensorflow==2.10
+tensorflow==2.10.1
 opencv>=4.0.0
 matplotlib
 seaborn

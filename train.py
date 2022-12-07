@@ -2,15 +2,15 @@
 # Model training (TF-dataset version)
 # (c) kol, 2022
 
+import global_flags
 import matplotlib.pyplot as plt
 from absl import app, flags
-import global_flags
 
 from model import (
     make_model, 
     load_model, 
     checkpoint_callback, 
-    cleanup_callbacks
+    cleanup_checkpoints
 )
 
 from image_dataset import (
@@ -63,7 +63,7 @@ def main(argv):
         callbacks=callbacks_list)
 
     if FLAGS.save:
-        cleanup_callbacks()
+        cleanup_checkpoints()
 
     if FLAGS.show:
         plot_history(history)

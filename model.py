@@ -1,9 +1,10 @@
 # LEGO sorter project
-# CNN model definition
+# CNN model definition and support functions
 # Based on standard VGG-16 architecture with additional layers to support transfer learning
 # (c) kol, 2022
 
 import os
+import global_flags
 import tensorflow as tf
 from absl import flags
 from keras.applications.vgg16 import VGG16, preprocess_input
@@ -16,15 +17,15 @@ CHECKPOINT_DIR = os.path.join(os.path.split(__file__)[0], 'checkpoints')
 FLAGS = flags.FLAGS
 flags.DEFINE_float('learning_rate', 1e-4, help='Learning rate')
 flags.DEFINE_float('dropout_rate', 0.2, help='Dropout rate')
-flags.DEFINE_float('regularizer_rate', 0.0, help='L2 regularizer rate')
+flags.DEFINE_float('regularizer_rate', 1e-3, help='L2 regularizer rate')
 flags.DEFINE_float('label_smoothing', 0.0, help='Label smoothing')
 
-def make_model(num_labels: int, use_grayscale: bool = False) -> tf.keras.Model:
+def make_model(num_labels: int) -> tf.keras.Model:
     """ Make and compile a Keras model """
 
     model = tf.keras.models.Sequential()
 
-    if not use_grayscale:
+    if not FLAGS.gray:
         input_shape = list(IMAGE_SIZE) + [3]
         vgg16 = VGG16(weights='imagenet', include_top=False, input_shape=input_shape)
         vgg16.trainable = False
@@ -41,6 +42,7 @@ def make_model(num_labels: int, use_grayscale: bool = False) -> tf.keras.Model:
         model.add(vgg16)
 
     model.add(tf.keras.layers.Flatten())
+    # model.add(tf.keras.GlobalAveragePooling2D())  # either this one or Flatten() should be included into the model
     model.add(tf.keras.layers.Dense(512, activation='relu'))
     # model.add(tf.keras.layers.Dense(256, activation='relu'))
     model.add(tf.keras.layers.Dense(128, activation='relu'))
@@ -85,24 +87,24 @@ def load_model(model: tf.keras.Model) -> tf.keras.Model:
 
     cp_path = tf.train.latest_checkpoint(os.path.join(CHECKPOINT_DIR, _checkpoint_subdir()))
     if not cp_path:
-        print('WARNING: no checkpoints found while loading the model')
+        print(f'WARNING: no checkpoints found in {cp_path}')
     else:
         print(f'Loading model from {cp_path}')
         model.load_weights(cp_path)
 
     return model
 
-def cleanup_callbacks(keep: int = 3):
-    """ Clean up abundant checkpoints after model.fit() run with checkpoint-saving callback """
+def cleanup_checkpoints(keep: int = 3):
+    """ Remove abundant checkpoints after model fit run with checkpoint-saving callback """
     import re
     
-    chkpt_path = os.path.join(CHECKPOINT_DIR, _checkpoint_subdir())
-    files = [fn for fn in os.listdir(chkpt_path) if fn.startswith('cp-')]
+    cp_path = os.path.join(CHECKPOINT_DIR, _checkpoint_subdir())
+    files = [fn for fn in os.listdir(cp_path) if fn.startswith('cp-')]
     file_idx = [int(re.search('\\d+', fn).group(0)) for fn in files]
 
     max_idx = max(file_idx) - keep
     if max_idx > 0:
         for fn, idx in zip(files, file_idx):
             if idx < max_idx:
-                os.remove(os.path.join(chkpt_path, fn))
+                os.remove(os.path.join(cp_path, fn))
 

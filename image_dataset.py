@@ -3,13 +3,14 @@
 # (c) kol, 2022
 
 import os
+import global_flags
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from absl import flags
 from keras.utils import image_dataset_from_directory
 from collections import namedtuple
-from typing import Tuple, Iterable, Union
+from typing import Tuple, Iterable
 
 import global_flags
 from model import BATCH_SIZE, IMAGE_SIZE, preprocess_input
@@ -32,7 +33,7 @@ def load_dataset() -> ImageDataset:
     ds = image_dataset_from_directory(
         IMAGE_DIR,
         label_mode='categorical',
-        color_mode='grayscale' if flags.FLAGS.gray else 'rgb',
+        color_mode='rgb',
         batch_size=None,
         image_size=IMAGE_SIZE,
         shuffle=False,
