@@ -16,9 +16,21 @@ CHECKPOINT_DIR = os.path.join(os.path.split(__file__)[0], 'checkpoints')
 
 FLAGS = flags.FLAGS
 flags.DEFINE_float('learning_rate', 1e-4, help='Learning rate')
-flags.DEFINE_float('dropout_rate', 0.2, help='Dropout rate')
-flags.DEFINE_float('regularizer_rate', 1e-3, help='L2 regularizer rate')
+flags.DEFINE_float('dropout_rate', 0.0, help='Dropout rate')
+flags.DEFINE_float('regularizer_rate', 0.0, help='L2 regularizer rate')
 flags.DEFINE_float('label_smoothing', 0.0, help='Label smoothing')
+
+def _make_preproc_layers(last_layer):
+    layers = [
+        tf.keras.layers.RandomFlip('horizontal_and_vertical'),
+        tf.keras.layers.RandomRotation(0.2),
+        # tf.keras.layers.RandomZoom((0.2, 0.3), (0.2, 0.3)),
+        # tf.keras.layers.RandomBrightness(0.2)
+        # tf.keras.layers.RandomContrast(0.2)]    
+    ]
+    for layer in layers:
+        last_layer = layer(last_layer)
+    return last_layer
 
 def make_model(num_labels: int) -> tf.keras.Model:
     """ Make and compile a Keras model """
@@ -27,27 +39,28 @@ def make_model(num_labels: int) -> tf.keras.Model:
 
     if not FLAGS.gray:
         input_shape = list(IMAGE_SIZE) + [3]
-        vgg16 = VGG16(weights='imagenet', include_top=False, input_shape=input_shape)
-        vgg16.trainable = False
-        model.add(vgg16)
+        input_layer = tf.keras.layers.Input(input_shape)
+        last_preproc_layer = _make_preproc_layers(input_layer)
     else:
         input_shape = list(IMAGE_SIZE) + [1]
         input_layer = tf.keras.layers.Input(input_shape)
         concat_layer = tf.keras.layers.Concatenate()([input_layer, input_layer, input_layer])
+        last_preproc_layer = _make_preproc_layers(concat_layer)
 
-        vgg16 = VGG16(weights='imagenet', include_top=False, input_tensor=concat_layer)
-        vgg16.trainable = False
-
-        model.add(input_layer)
-        model.add(vgg16)
-
+    vgg16 = VGG16(weights='imagenet', include_top=False, input_tensor=last_preproc_layer)
+    vgg16.trainable = False
+    model.add(input_layer)
+    model.add(vgg16)
     model.add(tf.keras.layers.Flatten())
-    # model.add(tf.keras.GlobalAveragePooling2D())  # either this one or Flatten() should be included into the model
+
+    # Either dense or GAP layers should be used
+    # model.add(tf.keras.layers.GlobalAveragePooling2D())
     model.add(tf.keras.layers.Dense(512, activation='relu'))
-    # model.add(tf.keras.layers.Dense(256, activation='relu'))
     model.add(tf.keras.layers.Dense(128, activation='relu'))
+
     if FLAGS.dropout_rate > 0:
         model.add(tf.keras.layers.Dropout(FLAGS.dropout_rate))
+
     if FLAGS.regularizer_rate > 0:
         model.add(tf.keras.layers.Dense(num_labels, activation='softmax',
             kernel_regularizer=tf.keras.regularizers.l2(FLAGS.regularizer_rate)))
@@ -85,12 +98,13 @@ def checkpoint_callback():
 def load_model(model: tf.keras.Model) -> tf.keras.Model:
     """ Load a model weights from latest checkpoint """
 
-    cp_path = tf.train.latest_checkpoint(os.path.join(CHECKPOINT_DIR, _checkpoint_subdir()))
-    if not cp_path:
+    cp_path = os.path.join(CHECKPOINT_DIR, _checkpoint_subdir())
+    cp_last = tf.train.latest_checkpoint(cp_path)
+    if not cp_last:
         print(f'WARNING: no checkpoints found in {cp_path}')
     else:
-        print(f'Loading model from {cp_path}')
-        model.load_weights(cp_path)
+        print(f'Loading model from {cp_last}')
+        model.load_weights(cp_last)
 
     return model
 
