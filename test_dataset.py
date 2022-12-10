@@ -4,8 +4,10 @@
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from absl import app, flags
+
+flags.declare_key_flag('gray')
+flags.declare_key_flag('edges')
 
 from image_dataset import (
     load_dataset, 
@@ -27,11 +29,11 @@ def get_labels(tag, tfds, class_names):
             })
     return real_labels
 
-def main():
+def main(argv):
     image_data = load_dataset()
-    show_samples(image_data)
 
     train_data, test_data = split_dataset(image_data)
+    show_samples(test_data, image_data.class_names)
 
     real_labels = \
         get_labels('train', train_data, image_data.class_names) + \
@@ -57,4 +59,4 @@ def main():
     print(group_var_mean)
 
 if __name__ == '__main__':
-    app(main)
+    app.run(main)

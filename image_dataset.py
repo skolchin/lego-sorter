@@ -12,7 +12,6 @@ from keras.utils import image_dataset_from_directory
 from collections import namedtuple
 from typing import Tuple, Iterable
 
-import global_flags
 from model import BATCH_SIZE, IMAGE_SIZE, preprocess_input
 
 IMAGE_DIR = os.path.join(os.path.split(__file__)[0], 'images')
@@ -25,6 +24,8 @@ def _preprocess(images, labels=None):
     result = preprocess_input(images)
     if flags.FLAGS.gray:
         result = tf.image.rgb_to_grayscale(result)
+    if flags.FLAGS.edges:
+        pass
     return result, labels
 
 def load_dataset() -> ImageDataset:
