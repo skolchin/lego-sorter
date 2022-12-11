@@ -1,14 +1,19 @@
 # LEGO sorter project
-# Overall pipeline tests
+# Image processing pipeline tests
 # (c) kol, 2022
 
 import cv2
+import logging
 import numpy as np
 import img_utils22 as imu
 
-def imshow(img: np.ndarray, title: str = None):
-    cv2.imshow(title, img)
-    cv2.waitKey(0)
+logging.basicConfig(format='%(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+def debug_imshow(img: np.ndarray, title: str = None):
+    if logger.getEffectiveLevel() == logging.DEBUG:
+        imu.imshow(img, title)
 
 def bincount_app(a):
     a2D = a.reshape(-1,a.shape[-1])
@@ -16,36 +21,21 @@ def bincount_app(a):
     a1D = np.ravel_multi_index(a2D.T, col_range)
     return np.unravel_index(np.bincount(a1D).argmax(), col_range)
 
-def get_bgmask(img, bgclr):
-    mask = imu.get_bgsub_mask(img, np.full(img.shape, bgclr, img.dtype))
-    nonzero = np.nonzero(mask)
-    if not nonzero[0].any() or not nonzero[1].any():
-        # only background color
-        return None
-    return mask
-
-BBOX_LAG = 50
-
-def detect_object(filename, debug=False):
-    # Load the file
-    img1 = cv2.imread(filename)
-    img1 = imu.resize(img1, scale=0.5)
-    if debug:
-        imshow(img1, 'source')
+def find_bgmask_multichannel(img: np.ndarray) -> np.ndarray:
 
     # Find most popular color, which is assumed to be background
-    bgclr = bincount_app(img1)
-    print(f'Assuming background color is {bgclr}')
+    bgclr = bincount_app(img)
+    logger.info('Background color is %s', bgclr)
 
     # Build a background subtraction mask
-    bg_mask = get_bgmask(img1, bgclr)
-    if bg_mask is None:
-        print('ERROR: no objects detected')
-        return None
-    if debug:
-        imshow(bg_mask, 'initial mask')
+    bg_mask = imu.get_bgsub_mask(img, np.full(img.shape, bgclr, img.dtype))
+    nonzero = np.nonzero(bg_mask)
+    if not nonzero[0].any() or not nonzero[1].any():
+        raise Exception('ERROR: only background color detected')
+    debug_imshow(bg_mask, 'initial bg_mask')
 
     # Flood fill holes within the mask starting from all 4 corners
+    # (there usually comes ligthing artifacts)
     bg_mask[ bg_mask != 0 ] = 255
     corners = [
         (0, 0), 
@@ -54,60 +44,102 @@ def detect_object(filename, debug=False):
         (bg_mask.shape[1]-1, bg_mask.shape[0]-1)
     ]
     for pt in corners:
-        # cv2.circle(bg_mask, pt, 5, 255, -1)
         cv2.floodFill(bg_mask, None, pt, 0)
-    if debug:
-        imshow(bg_mask, 'filled mask')
+    debug_imshow(bg_mask, 'filled bg_mask')
+    return bg_mask
 
+def find_bgmask_luminosity(img: np.ndarray) -> np.ndarray:
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    channels = cv2.split(lab)
+    # for n, c in enumerate(channels):
+    #     debug_imshow(c, f'channel {n}')
+    _, bgmask = cv2.threshold(channels[2], 127, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    debug_imshow(bgmask, 'initial bgmask')
+    return bgmask
+
+def bgmask_to_bbox(bg_mask: np.ndarray) -> tuple:
     # Find object contours
-    contours, hierarchy = cv2.findContours(bg_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(bg_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     if not len(contours):
-        print('ERROR: no objects detected')
-        return None
+        raise Exception('ERROR: no objects detected')
 
     # Get the maximum area contour (this is going to be an object)
     areas = [cv2.contourArea(c) for c in contours]
     contour = contours[np.argmax(areas)]
 
-    # Find bounding box and the center of countour
+    # Find bounding box
     bbox = cv2.boundingRect(contour)
-    M = cv2.moments(contour)
-    cx = int(M['m10'] / M['m00'])
-    cy = int(M['m01'] / M['m00'])
-    print(f'Objects bbox is {bbox} centered at ({cy,cx})')
+    # M = cv2.moments(contour)
+    # cx = int(M['m10'] / M['m00'])
+    # cy = int(M['m01'] / M['m00'])
+    return bbox, contour
 
-    # Relax a bounding box with some lag
+def replace_color(img, replace_clr, src_clr = None, mask = None, exclude_contour = None):
+    if mask is None and src_clr is None:
+        raise ValueError('No search parameters specified')
+    if mask is None:
+        img[ img == src_clr ] = replace_clr
+    else:
+        if exclude_contour is not None:
+            # Draw the contor onto the mask with white color and slightly extend its boundaries
+            mask = mask.copy()
+            mask = cv2.drawContours(mask, [exclude_contour], 0, 255, -1)
+            mask = cv2.dilate(mask, imu.misc.get_kernel(3),
+                        iterations=1,
+                        borderType=cv2.BORDER_CONSTANT,
+                        borderValue=255)
+        img[ mask == 0 ] = replace_clr
+    return img
+
+def extract_object(img1, method='multichannel', enlarge_boundaries=0.3, replace_bgclr=None):
+    """ Detect and extract an object """
+
+    # Prepare background subtraction mask
+    if method == 'multichannel':
+        bgmask = find_bgmask_multichannel(img1)
+    elif method == 'luminosity':
+        bgmask = find_bgmask_luminosity(img1)
+    else:
+        raise ValueError('Unknown method %s', method)
+
+    # Convert to bounding box
+    bbox, contour = bgmask_to_bbox(bgmask)
+    logger.info(f'Object detected: {bbox}')
+
+    # Relax bbox by given boundary enlargement coefficient or value
+    if isinstance(enlarge_boundaries, float):
+        dw, dh = int(bbox[2]*enlarge_boundaries), int(bbox[3]*enlarge_boundaries)
+    else:
+        dw, dh = int(enlarge_boundaries), int(enlarge_boundaries)
     bbox_relaxed = [
-        max(bbox[0] - BBOX_LAG, 0),
-        max(bbox[1] - BBOX_LAG, 0),
-        min(bbox[0] + bbox[2] + BBOX_LAG, img1.shape[1]),
-        min(bbox[1] + bbox[3] + BBOX_LAG, img1.shape[0])
+        max(bbox[0] - dw, 0),
+        max(bbox[1] - dh, 0),
+        min(bbox[0] + bbox[2] + dw, img1.shape[1]),
+        min(bbox[1] + bbox[3] + dh, img1.shape[0])
     ]
-    if debug:
-        img_copy = img1.copy()
-        cv2.drawContours(img_copy, [contour], 0, (0, 0, 255))
-        cv2.rectangle(img_copy, 
+    if logger.getEffectiveLevel() == logging.DEBUG:
+        debug_img = img1.copy()
+        cv2.rectangle(debug_img, 
             (bbox_relaxed[0], bbox_relaxed[1]), 
             (bbox_relaxed[2], bbox_relaxed[3]),
             (0, 255, 0), 2)
-        imshow(img_copy, 'countour and bbox')
+        imu.imshow(debug_img, 'bbox')
 
-    # Remove any background replacing it with single color
-    img2 = img1.copy()
-    img2[ bg_mask == 0] = imu.COLOR_WHITE
+    if replace_bgclr is not None:
+        # Replace background with single color
+        img1 = img1.copy()
+        img1 = replace_color(img1, replace_bgclr, mask=bgmask, exclude_contour=contour)
 
     # Extract ROI
-    img2 = imu.get_image_area(img2, bbox_relaxed)
-    if debug:
-        imshow(img2, 'result')
+    img2 = imu.get_image_area(img1, bbox_relaxed)
     return img2
 
 def main():
-    detect_object('out\\3003_test.png', debug=True)
-    # detect_object('out\\photo_2022-11-07_15-01-22.jpg', debug=True)
+    source = cv2.imread('out\\photo_2022-11-07_15-01-22.jpg')
+    imu.imshow(source, 'source')
+    result = extract_object(source, method='luminosity', replace_bgclr=imu.COLOR_WHITE)
+    imu.imshow(result, 'result')
+    cv2.imwrite('out\\test.png', result)
 
 if __name__ == '__main__':
-    try:
-        main()
-    finally:
-        cv2.destroyAllWindows()
+    main()
