@@ -48,12 +48,12 @@ def find_bgmask_multichannel(img: np.ndarray) -> np.ndarray:
     debug_imshow(bg_mask, 'filled bg_mask')
     return bg_mask
 
-def find_bgmask_luminosity(img: np.ndarray) -> np.ndarray:
+def find_bgmask_luminosity(img: np.ndarray, process_channel=2) -> np.ndarray:
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
     channels = cv2.split(lab)
     # for n, c in enumerate(channels):
     #     debug_imshow(c, f'channel {n}')
-    _, bgmask = cv2.threshold(channels[2], 127, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    _, bgmask = cv2.threshold(channels[process_channel], 127, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
     debug_imshow(bgmask, 'initial bgmask')
     return bgmask
 
