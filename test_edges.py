@@ -1,5 +1,5 @@
 # LEGO sorter project
-# Pipeline tests - probably should be moved to img_utils22?
+# Edges detection pipeline tests
 # (c) kol, 2022
 
 import cv2
@@ -7,10 +7,10 @@ import numpy as np
 import img_utils22 as imu
 
 def main():
-    pipe1 = imu.Pipe() | imu.LoadFile('./out/3003_test.png') | imu.ShowImage('source')
+    pipe1 = imu.Pipe() | imu.LoadFile('./out/3003_test.png') | imu.Resize(scale=0.5) | imu.ShowImage('source')
     img1 = pipe1(None)
 
-    pipe2 = imu.Pipe() | imu.EqualizeLuminosity() | imu.Blur() | imu.Gray() | imu.Edges() | imu.Dilate(kernel_size=2) | imu.ShowImage('mask')
+    pipe2 = imu.Pipe() | imu.EqualizeLuminosity() | imu.Blur() | imu.Gray() | imu.Edges() | imu.Dilate(kernel_size=1) | imu.ShowImage('mask')
     mask = pipe2(img1)
     mask_inv = cv2.bitwise_not(mask)
 
