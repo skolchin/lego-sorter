@@ -51,9 +51,16 @@ def find_bgmask_multichannel(img: np.ndarray) -> np.ndarray:
 def find_bgmask_luminosity(img: np.ndarray, process_channel=2) -> np.ndarray:
     lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
     channels = cv2.split(lab)
-    # for n, c in enumerate(channels):
-    #     debug_imshow(c, f'channel {n}')
-    _, bgmask = cv2.threshold(channels[process_channel], 127, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    for n, c in enumerate(channels):
+        debug_imshow(c, f'channel {n}')
+
+    ch = channels[process_channel]
+    _, bgmask = cv2.threshold(ch, 150, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    bgmask = cv2.dilate(bgmask, imu.misc.get_kernel(3),
+                iterations=1,
+                borderType=cv2.BORDER_CONSTANT,
+                borderValue=0)
+
     debug_imshow(bgmask, 'initial bgmask')
     return bgmask
 
@@ -91,8 +98,11 @@ def replace_color(img, replace_clr, src_clr = None, mask = None, exclude_contour
         img[ mask == 0 ] = replace_clr
     return img
 
-def extract_object(img1, method='multichannel', enlarge_boundaries=0.3, replace_bgclr=None):
+def extract_object(img1, method='multichannel', extract_roi=True, enlarge_boundaries=0.3, replace_bgclr=None):
     """ Detect and extract an object """
+
+    if replace_bgclr is None and not extract_roi:
+        raise ValueError('Invalid parameter combination')
 
     # Prepare background subtraction mask
     if method == 'multichannel':
@@ -111,6 +121,7 @@ def extract_object(img1, method='multichannel', enlarge_boundaries=0.3, replace_
         dw, dh = int(bbox[2]*enlarge_boundaries), int(bbox[3]*enlarge_boundaries)
     else:
         dw, dh = int(enlarge_boundaries), int(enlarge_boundaries)
+
     bbox_relaxed = [
         max(bbox[0] - dw, 0),
         max(bbox[1] - dh, 0),
@@ -130,16 +141,25 @@ def extract_object(img1, method='multichannel', enlarge_boundaries=0.3, replace_
         img1 = img1.copy()
         img1 = replace_color(img1, replace_bgclr, mask=bgmask, exclude_contour=contour)
 
-    # Extract ROI
-    img2 = imu.get_image_area(img1, bbox_relaxed)
-    return img2
+    if extract_roi:
+        # Extract ROI
+        return imu.get_image_area(img1, bbox_relaxed)
+
+    return img1
 
 def main():
-    source = cv2.imread('out\\photo_2022-11-07_15-01-22.jpg')
+    # source = cv2.imread('out\\3003_test.png')
+    # imu.imshow(source, 'source')
+    # result = extract_object(source, method='luminosity')
+    # imu.imshow(result, 'result')
+    # (314, 273, 204, 212)
+
+    source = cv2.imread('out\\photo_2022-12-11_21-48-19.jpg')
+    # source = imu.resize(source, (815,815))    
     imu.imshow(source, 'source')
-    result = extract_object(source, method='luminosity', replace_bgclr=imu.COLOR_WHITE)
+    result = extract_object(source, method='multichannel', extract_roi=False, replace_bgclr=imu.COLOR_WHITE)
     imu.imshow(result, 'result')
-    cv2.imwrite('out\\test.png', result)
+    cv2.imwrite(f'out\\3003_test2.png', result)
 
 if __name__ == '__main__':
     main()

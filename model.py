@@ -24,9 +24,9 @@ def _make_preproc_layers(last_layer):
     layers = [
         tf.keras.layers.RandomFlip('horizontal_and_vertical'),
         tf.keras.layers.RandomRotation(0.2),
-        # tf.keras.layers.RandomZoom((0.2, 0.3), (0.2, 0.3)),
+        tf.keras.layers.RandomZoom((-0.2, 0.2)),
         # tf.keras.layers.RandomBrightness(0.2)
-        # tf.keras.layers.RandomContrast(0.2)]    
+        # tf.keras.layers.RandomContrast(0.2)]
     ]
     for layer in layers:
         last_layer = layer(last_layer)
@@ -108,17 +108,19 @@ def load_model(model: tf.keras.Model) -> tf.keras.Model:
 
     return model
 
-def cleanup_checkpoints(keep: int = 3):
+def cleanup_checkpoints():
     """ Remove abundant checkpoints after model fit run with checkpoint-saving callback """
-    import re
-    
-    cp_path = os.path.join(CHECKPOINT_DIR, _checkpoint_subdir())
-    files = [fn for fn in os.listdir(cp_path) if fn.startswith('cp-')]
-    file_idx = [int(re.search('\\d+', fn).group(0)) for fn in files]
-
-    max_idx = max(file_idx) - keep
-    if max_idx > 0:
-        for fn, idx in zip(files, file_idx):
-            if idx < max_idx:
+    try:
+        cp_path = os.path.join(CHECKPOINT_DIR, _checkpoint_subdir())
+        cp_name = None
+        with open(os.path.join(cp_path, 'checkpoint'), 'r') as fp:
+            for line in fp.readlines():
+                if 'model_checkpoint_path' in line:
+                    cp_name = line.split(':')[1].strip().strip('\"')
+        if cp_name:
+            print(f'Latest checkpoint is {cp_name}')
+            files = [fn for fn in os.listdir(cp_path) if fn.startswith('cp-') and not cp_name in fn]
+            for fn in files:
                 os.remove(os.path.join(cp_path, fn))
-
+    except FileNotFoundError:
+        pass
