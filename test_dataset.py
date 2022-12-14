@@ -2,6 +2,7 @@
 # TF dataset test
 # (c) kol, 2022
 
+import global_flags
 import numpy as np
 import pandas as pd
 from absl import app, flags
@@ -13,6 +14,7 @@ from image_dataset import (
     load_dataset, 
     show_samples,
     split_dataset, 
+    augment_dataset,
 )
 
 def get_labels(tag, tfds, class_names):
@@ -33,7 +35,8 @@ def main(argv):
     image_data = load_dataset()
 
     train_data, test_data = split_dataset(image_data)
-    show_samples(test_data, image_data.class_names)
+    aug_data = augment_dataset(test_data)
+    show_samples(aug_data, image_data.class_names)
 
     real_labels = \
         get_labels('train', train_data, image_data.class_names) + \

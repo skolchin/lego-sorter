@@ -47,7 +47,7 @@ def plot_confusion_matrix(actual, predicted, class_names):
     plt.show()
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('file', None, 'Predict for given image file', short_name='f')
+flags.DEFINE_multi_string('file', None, 'Predict for image files', short_name='f')
 flags.DEFINE_string('label', None, 'Predict for specific label', short_name='c')
 flags.DEFINE_boolean('confusion', None, 'Plot confusion matrix', short_name='m')
 flags.declare_key_flag('gray')
@@ -67,14 +67,15 @@ def main(argv):
         show_prediction_samples(model, label_data, image_data.class_names)
 
     elif FLAGS.file:
-        # prediction for given file
-        true_label = get_file_label(FLAGS.file)
-        predict_image(model, FLAGS.file, image_data.class_names, true_label)
+        # prediction for given file(s)
+        for fn in FLAGS.file:
+            true_label = get_file_label(fn)
+            predict_image(model, fn, image_data.class_names, true_label)
 
     elif FLAGS.confusion:
         # plot confusion matrix
-        _, test_data = split_dataset(image_data)
-        true_labels, pred_labels = get_predictions(model, test_data)
+        # _, test_data = split_dataset(image_data)
+        true_labels, pred_labels = get_predictions(model, image_data.tfds)
         plot_confusion_matrix(true_labels, pred_labels, image_data.class_names)
         
     else:

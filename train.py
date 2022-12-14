@@ -16,13 +16,14 @@ from model import (
 from image_dataset import (
     load_dataset, 
     show_samples,
-    split_dataset, 
+    split_dataset,
+    augment_dataset,
     show_prediction_samples
 )
 
 def plot_history(history):
     _, axs = plt.subplots(1, 2, sharey=True)
-    for i, metric in enumerate([('accuracy', 'val_accuracy'), ('loss', 'val_loss')]):
+    for i, metric in enumerate([('categorical_accuracy', 'val_categorical_accuracy'), ('loss', 'val_loss')]):
         axs[i].plot(history.history[metric[0]])
         axs[i].plot(history.history[metric[1]])
         axs[i].set_title(f'{metric[0].capitalize()} plot')
@@ -45,6 +46,7 @@ def main(argv):
  
     num_labels = len(image_data.class_names)
     train_data, test_data = split_dataset(image_data)
+    aug_data = augment_dataset(train_data)
 
     model = make_model(num_labels)
     print('\nModel summary:\n---')
@@ -57,7 +59,7 @@ def main(argv):
         load_model(model)
 
     history = model.fit(
-        train_data, 
+        aug_data, 
         validation_data=test_data, 
         epochs=FLAGS.epoch,
         callbacks=callbacks_list)

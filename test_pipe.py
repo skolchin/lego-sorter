@@ -147,6 +147,7 @@ def extract_object(img1, method='multichannel', extract_roi=True, enlarge_bounda
 
     return img1
 
+
 def main():
     # source = cv2.imread('out\\3003_test.png')
     # imu.imshow(source, 'source')
@@ -155,11 +156,10 @@ def main():
     # (314, 273, 204, 212)
 
     source = cv2.imread('out\\photo_2022-12-11_21-48-19.jpg')
-    # source = imu.resize(source, (815,815))    
     imu.imshow(source, 'source')
-    result = extract_object(source, method='multichannel', extract_roi=False, replace_bgclr=imu.COLOR_WHITE)
+    result = extract_object(source, method='multichannel', extract_roi=True, replace_bgclr=imu.COLOR_WHITE)
     imu.imshow(result, 'result')
-    cv2.imwrite(f'out\\3003_test2.png', result)
+    # cv2.imwrite(f'out\\3003_test2.png', result)
 
 if __name__ == '__main__':
     main()
