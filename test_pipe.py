@@ -11,9 +11,12 @@ logging.basicConfig(format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+def is_debug() -> bool:
+    return logger.getEffectiveLevel() == logging.DEBUG
+
 def debug_imshow(img: np.ndarray, title: str = None):
-    if logger.getEffectiveLevel() == logging.DEBUG:
-        imu.imshow(img, title)
+    if is_debug():
+        imu.imshow(img, title, (600, 800))
 
 def bincount_app(a):
     a2D = a.reshape(-1,a.shape[-1])
@@ -64,11 +67,24 @@ def find_bgmask_luminosity(img: np.ndarray, process_channel=2) -> np.ndarray:
     debug_imshow(bgmask, 'initial bgmask')
     return bgmask
 
+def find_bgmask_thresh(img: np.ndarray):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    _, bgmask = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+    debug_imshow(bgmask, 'initial bgmask')
+    return bgmask
+
 def bgmask_to_bbox(bg_mask: np.ndarray) -> tuple:
     # Find object contours
-    contours, _ = cv2.findContours(bg_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(bg_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
     if not len(contours):
         raise Exception('ERROR: no objects detected')
+    logger.debug(f'{len(contours)} contours detected')
+
+    if is_debug():
+        canvas = np.full(bg_mask.shape, 0, dtype=np.uint8)
+        for i in range(len(contours)):
+            cv2.drawContours(canvas, contours, i, 255, 1, hierarchy=hierarchy)
+        debug_imshow(canvas, 'contours')
 
     # Get the maximum area contour (this is going to be an object)
     areas = [cv2.contourArea(c) for c in contours]
@@ -76,10 +92,10 @@ def bgmask_to_bbox(bg_mask: np.ndarray) -> tuple:
 
     # Find bounding box
     bbox = cv2.boundingRect(contour)
-    # M = cv2.moments(contour)
-    # cx = int(M['m10'] / M['m00'])
-    # cy = int(M['m01'] / M['m00'])
-    return bbox, contour
+    M = cv2.moments(contour)
+    cx = int(M['m10'] / M['m00'])
+    cy = int(M['m01'] / M['m00'])
+    return (cx, cy), bbox, contour
 
 def replace_color(img, replace_clr, src_clr = None, mask = None, exclude_contour = None):
     if mask is None and src_clr is None:
@@ -95,46 +111,77 @@ def replace_color(img, replace_clr, src_clr = None, mask = None, exclude_contour
                         iterations=1,
                         borderType=cv2.BORDER_CONSTANT,
                         borderValue=255)
+            debug_imshow(mask, 'contour filled')
         img[ mask == 0 ] = replace_clr
     return img
 
-def extract_object(img1, method='multichannel', extract_roi=True, enlarge_boundaries=0.3, replace_bgclr=None):
+def extract_object(img1, 
+    method='multichannel', 
+    extract_roi=True, 
+    roi_size=None,
+    bbox_relax=None,
+    replace_bgclr=None):
     """ Detect and extract an object """
 
     if replace_bgclr is None and not extract_roi:
+        raise ValueError('Invalid parameter combination ')
+    if roi_size is not None and bbox_relax is not None:
         raise ValueError('Invalid parameter combination')
+    if bbox_relax is None:
+        bbox_relax = 0.3
 
     # Prepare background subtraction mask
-    if method == 'multichannel':
-        bgmask = find_bgmask_multichannel(img1)
-    elif method == 'luminosity':
-        bgmask = find_bgmask_luminosity(img1)
-    else:
-        raise ValueError('Unknown method %s', method)
+    match method:
+        case 'multichannel':
+            bgmask = find_bgmask_multichannel(img1)
+        case 'luminosity':
+            bgmask = find_bgmask_luminosity(img1)
+        case 'threshold':
+            bgmask = find_bgmask_thresh(img1)
+        case _:
+            raise ValueError('Unknown method %s', method)
 
     # Convert to bounding box
-    bbox, contour = bgmask_to_bbox(bgmask)
-    logger.info(f'Object detected: {bbox}')
+    center, bbox, contour = bgmask_to_bbox(bgmask)
+    logger.info(f'Object detected at {center} bbox {bbox}')
 
-    # Relax bbox by given boundary enlargement coefficient or value
-    if isinstance(enlarge_boundaries, float):
-        dw, dh = int(bbox[2]*enlarge_boundaries), int(bbox[3]*enlarge_boundaries)
+    if roi_size is None:
+        # Relax bbox by given boundary enlargement coefficient or constant value
+        if isinstance(bbox_relax, float):
+            dw, dh = int(bbox[2]*bbox_relax), int(bbox[3]*bbox_relax)
+        else:
+            dw, dh = bbox_relax, bbox_relax
+
+        bbox_roi = [
+            max(bbox[0] - dw, 0),
+            max(bbox[1] - dh, 0),
+            min(bbox[0] + bbox[2] + dw, img1.shape[1]),
+            min(bbox[1] + bbox[3] + dh, img1.shape[0])
+        ]
     else:
-        dw, dh = int(enlarge_boundaries), int(enlarge_boundaries)
+        # Exact ROI size provided
+        x, y = max(int(center[0] - roi_size[1]/2), 0), max(int(center[1] - roi_size[0]/2), 0)
+        bbox_roi = [
+            x,
+            y,
+            int(x + roi_size[1]),
+            int(y + roi_size[0])
+        ]
+        if bbox_roi[2] > img1.shape[1]:
+            logger.warning(f'Image is not wide enought to extract ROI centered at {center} given required width {roi_size[0]}')
+            bbox_roi[2] = img1.shape[1]
+        if bbox_roi[3] > img1.shape[0]:
+            logger.warning(f'Image is not long enought to extract ROI centered at {center} given required height {roi_size[0]}')
+            bbox_roi[3] = img1.shape[0]
+    logger.info(f'ROI bbox: {bbox_roi}')
 
-    bbox_relaxed = [
-        max(bbox[0] - dw, 0),
-        max(bbox[1] - dh, 0),
-        min(bbox[0] + bbox[2] + dw, img1.shape[1]),
-        min(bbox[1] + bbox[3] + dh, img1.shape[0])
-    ]
-    if logger.getEffectiveLevel() == logging.DEBUG:
+    if is_debug():
         debug_img = img1.copy()
         cv2.rectangle(debug_img, 
-            (bbox_relaxed[0], bbox_relaxed[1]), 
-            (bbox_relaxed[2], bbox_relaxed[3]),
+            (bbox_roi[0], bbox_roi[1]), 
+            (bbox_roi[2], bbox_roi[3]),
             (0, 255, 0), 2)
-        imu.imshow(debug_img, 'bbox')
+        debug_imshow(debug_img, 'bbox')
 
     if replace_bgclr is not None:
         # Replace background with single color
@@ -143,7 +190,7 @@ def extract_object(img1, method='multichannel', extract_roi=True, enlarge_bounda
 
     if extract_roi:
         # Extract ROI
-        return imu.get_image_area(img1, bbox_relaxed)
+        return imu.get_image_area(img1, bbox_roi)
 
     return img1
 
@@ -155,11 +202,14 @@ def main():
     # imu.imshow(result, 'result')
     # (314, 273, 204, 212)
 
-    source = cv2.imread('out\\photo_2022-12-11_21-48-19.jpg')
-    imu.imshow(source, 'source')
-    result = extract_object(source, method='multichannel', extract_roi=True, replace_bgclr=imu.COLOR_WHITE)
+    source = cv2.imread('out\\photo_2022-12-16_21-05-36.jpg')
+    imu.imshow(source, 'source', (600, 800))
+
+    result = extract_object(source, method='multichannel', extract_roi=True, roi_size=(480, 640), replace_bgclr=None)
     imu.imshow(result, 'result')
-    # cv2.imwrite(f'out\\3003_test2.png', result)
+
+    resized = imu.rescale(result, scale=1.5, center=True, pad_color=imu.COLOR_WHITE)
+    cv2.imwrite(f'out\\3003_test3.png', resized)
 
 if __name__ == '__main__':
     main()

@@ -124,21 +124,38 @@ def predict_image(
     model: tf.keras.Model, 
     file_name: str, 
     class_names: Iterable[str], 
-    true_label: str = None):
-    """ Run a pretrained model prediction on given image file """
+    true_label: str = None,
+    show_actual: bool = True):
+    """ Run a pretrained model prediction on an image file """
 
-    image = tf.image.decode_image(tf.io.read_file(file_name))
-    image = tf.image.resize(image, IMAGE_SIZE)
-    prepared_image, _ = _preprocess(tf.expand_dims(image, 0), None)
+    predict_images(model, [file_name], class_names, [true_label], show_actual)
 
-    prediction = model.predict(prepared_image)
-    most_likely = np.argmax(prediction)
-    predicted_label = class_names[most_likely]
-    predicted_prob = prediction[0][most_likely]
+def predict_images(
+    model: tf.keras.Model, 
+    file_names: Iterable[str], 
+    class_names: Iterable[str], 
+    true_labels: Iterable[str] = None,
+    show_actual: bool = True):
+    """ Run a pretrained model prediction on multiple image files """
 
-    plt.title(f'{true_label or "?"} <- {predicted_label} ({predicted_prob:.2%})')
-    plt.imshow(tf.cast(image, tf.uint8))
-    plt.axis('off')
+    for file_name, true_label in zip(file_names, true_labels):
+        image = tf.image.decode_image(tf.io.read_file(file_name))
+        resized_image = tf.image.resize(image, IMAGE_SIZE)
+        prepared_image, _ = _preprocess(tf.expand_dims(resized_image, 0), None)
+
+        prediction = model.predict(prepared_image)
+        most_likely = np.argmax(prediction)
+        predicted_label = class_names[most_likely]
+        predicted_prob = prediction[0][most_likely]
+
+        plt.figure(file_name)
+        plt.title(f'{true_label or "?"} <- {predicted_label} ({predicted_prob:.2%})')
+        if show_actual:
+            plt.imshow(tf.cast(image, tf.uint8))
+        else:
+            plt.imshow(prepared_image[0].numpy())
+        plt.axis('off')
+
     plt.show()
 
 def show_prediction_samples(

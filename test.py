@@ -17,7 +17,7 @@ from image_dataset import (
     show_prediction_samples,
     split_dataset,
     filter_dataset_by_label, 
-    predict_image,
+    predict_images,
     get_predictions
 )
 
@@ -47,7 +47,7 @@ def plot_confusion_matrix(actual, predicted, class_names):
     plt.show()
 
 FLAGS = flags.FLAGS
-flags.DEFINE_multi_string('file', None, 'Predict for image files', short_name='f')
+flags.DEFINE_multi_string('files', None, 'Predict for image files', short_name='f')
 flags.DEFINE_string('label', None, 'Predict for specific label', short_name='c')
 flags.DEFINE_boolean('confusion', None, 'Plot confusion matrix', short_name='m')
 flags.declare_key_flag('gray')
@@ -66,11 +66,10 @@ def main(argv):
         label_data = filter_dataset_by_label(image_data.tfds, image_data.class_names, FLAGS.label)
         show_prediction_samples(model, label_data, image_data.class_names)
 
-    elif FLAGS.file:
+    elif FLAGS.files:
         # prediction for given file(s)
-        for fn in FLAGS.file:
-            true_label = get_file_label(fn)
-            predict_image(model, fn, image_data.class_names, true_label)
+        true_labels = [get_file_label(fn) for fn in FLAGS.files]
+        predict_images(model, FLAGS.files, image_data.class_names, true_labels)
 
     elif FLAGS.confusion:
         # plot confusion matrix
