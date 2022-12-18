@@ -1,5 +1,5 @@
 # LEGO sorter project
-# Model testing (TF-dataset version)
+# Model testing script
 # (c) kol, 2022
 
 import os

@@ -1,5 +1,5 @@
 # LEGO sorter project
-# Model training (TF-dataset version)
+# Model training script
 # (c) kol, 2022
 
 import matplotlib.pyplot as plt
@@ -36,6 +36,7 @@ flags.DEFINE_integer('epoch', default=30, lower_bound=1, short_name='n',
 flags.DEFINE_boolean('show', default=True, help='Show image samples and plots')
 flags.DEFINE_boolean('save', default=True, help='Save model to disk')
 flags.declare_key_flag('gray')
+flags.declare_key_flag('edges')
 
 def main(argv):
     """ Train the LEGO Sorter model """
