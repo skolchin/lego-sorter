@@ -20,21 +20,28 @@ flags.declare_key_flag('edges')
 
 def main(argv):
     """ Video recognition pipeline """
-    cap = cv2.VideoCapture(-1)
-    if not cap.isOpened():
+    cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    if not cam.isOpened():
         logger.error('Cannot open camera, exiting')
         return
 
+    cam.set(cv2.CAP_PROP_SETTINGS, 1)
+    cam.set(cv2.CAP_PROP_FPS, 30.0)
+    cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('m','j','p','g'))
+    cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('M','J','P','G'))
+    cam.set(cv2.CAP_PROP_FRAME_WIDTH, 600)
+    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 800)
+
     while True:
-        ret, frame = cap.read()
+        ret, frame = cam.read()
         if not ret:
             break
 
         cv2.imshow('frame', frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if cv2.waitKey(30) & 0xFF in (27, ord('q')):
             break
 
-    cap.release()
+    cam.release()
 
 if __name__ == '__main__':
     app.run(main)
