@@ -4,15 +4,11 @@
 # (c) kol, 2022
 
 import os
-import global_flags
 import tensorflow as tf
 from absl import flags
 from keras.applications.vgg16 import VGG16, preprocess_input
 
-BATCH_SIZE = 32
-IMAGE_SIZE = (256, 256)
-MODEL_DIR = os.path.join(os.path.split(__file__)[0], 'model')
-CHECKPOINT_DIR = os.path.join(os.path.split(__file__)[0], 'checkpoints')
+from lib.globals import IMAGE_SIZE, CHECKPOINT_DIR
 
 FLAGS = flags.FLAGS
 flags.DEFINE_float('learning_rate', 1e-4, help='Learning rate')

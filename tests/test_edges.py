@@ -2,9 +2,13 @@
 # Edges detection pipeline tests
 # (c) kol, 2022
 
+import os
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
+
+from root_dir import OUT_DIR
+
 # import cv2
 # import img_utils22 as imu
 
@@ -39,7 +43,7 @@ def tf_equalize_histogram(image):
     return eq_hist
 
 def main():
-    image_raw = tf.io.read_file('out\\3003_test.png')
+    image_raw = tf.io.read_file(os.path.join(OUT_DIR,'3003_test.png'))
     image = tf.image.decode_image(image_raw)
 
     # image = tf.image.convert_image_dtype(image, tf.float32)

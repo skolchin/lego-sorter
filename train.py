@@ -2,18 +2,18 @@
 # Model training (TF-dataset version)
 # (c) kol, 2022
 
-import global_flags
 import matplotlib.pyplot as plt
 from absl import app, flags
 
-from model import (
+import lib.globals
+from lib.model import (
     make_model, 
     load_model, 
     checkpoint_callback, 
     cleanup_checkpoints
 )
 
-from image_dataset import (
+from lib.image_dataset import (
     load_dataset, 
     show_samples,
     split_dataset,

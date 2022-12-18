@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from keras.utils import to_categorical
 from typing import Tuple
 
-from model import preprocess_input
+from lib.model import preprocess_input
 
 IMAGE_DIR = os.path.join(os.path.split(__file__)[0], 'images')
 

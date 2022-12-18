@@ -2,10 +2,12 @@
 # Image processing pipeline tests
 # (c) kol, 2022
 
+import os
 import cv2
 import logging
 import numpy as np
 import img_utils22 as imu
+from root_dir import OUT_DIR
 
 logging.basicConfig(format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
@@ -202,14 +204,14 @@ def main():
     # imu.imshow(result, 'result')
     # (314, 273, 204, 212)
 
-    source = cv2.imread('out\\photo_2022-12-16_21-05-36.jpg')
+    source = cv2.imread(os.path.join(OUT_DIR,'photo_2022-12-16_21-05-36.jpg'))
     imu.imshow(source, 'source', (600, 800))
 
     result = extract_object(source, method='multichannel', extract_roi=True, roi_size=(480, 640), replace_bgclr=None)
     imu.imshow(result, 'result')
 
     resized = imu.rescale(result, scale=1.5, center=True, pad_color=imu.COLOR_WHITE)
-    cv2.imwrite(f'out\\3003_test3.png', resized)
+    # cv2.imwrite(os.path.join(OUT_DIR,'out\\3003_test3.png'), resized)
 
 if __name__ == '__main__':
     main()

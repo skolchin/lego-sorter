@@ -4,18 +4,17 @@
 
 import os
 import re
-import global_flags
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import seaborn as sns
 from absl import app, flags
 
-from model import load_model, make_model
+import lib.globals
+from lib.model import load_model, make_model
 
-from image_dataset import (
+from lib.image_dataset import (
     load_dataset, 
     show_prediction_samples,
-    split_dataset,
     filter_dataset_by_label, 
     predict_images,
     get_predictions
@@ -51,6 +50,7 @@ flags.DEFINE_multi_string('files', None, 'Predict for image files', short_name='
 flags.DEFINE_string('label', None, 'Predict for specific label', short_name='c')
 flags.DEFINE_boolean('confusion', None, 'Plot confusion matrix', short_name='m')
 flags.declare_key_flag('gray')
+flags.declare_key_flag('edges')
 
 def main(argv):
     """ Test the LEGO Sorter model """

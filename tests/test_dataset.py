@@ -2,15 +2,16 @@
 # TF dataset test
 # (c) kol, 2022
 
-import global_flags
 import numpy as np
 import pandas as pd
 from absl import app, flags
+from root_dir import ROOT_DIR
 
+import lib.globals
 flags.declare_key_flag('gray')
 flags.declare_key_flag('edges')
 
-from image_dataset import (
+from lib.image_dataset import (
     load_dataset, 
     show_samples,
     split_dataset, 

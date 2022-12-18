@@ -2,8 +2,6 @@
 # Image loading and pre-processing functions (TF-dataset version)
 # (c) kol, 2022
 
-import os
-import global_flags
 import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
@@ -13,12 +11,10 @@ from keras.utils import image_dataset_from_directory
 from collections import namedtuple
 from typing import Tuple, Iterable
 
-from model import BATCH_SIZE, IMAGE_SIZE, preprocess_input
+from lib.globals import IMAGE_DIR, BATCH_SIZE, IMAGE_SIZE
+from lib.model import preprocess_input
 
 FLAGS = flags.FLAGS
-
-IMAGE_DIR = os.path.join(os.path.split(__file__)[0], 'images')
-""" Images root"""
 
 ImageDataset = namedtuple('ImageDataset', ['tfds', 'num_files', 'class_names'])
 """ Image dataset wrapper """
