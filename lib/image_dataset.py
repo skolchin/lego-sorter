@@ -118,41 +118,58 @@ def show_samples(tfds: tf.data.Dataset, class_names: Iterable[str], num_samples:
 
 def predict_image(
     model: tf.keras.Model, 
+    image: np.ndarray, 
+    class_names: Iterable[str]):
+    """ Run a pretrained model prediction on an image """
+
+    resized_image = tf.image.resize(image, IMAGE_SIZE)
+    prepared_image, _ = _preprocess(tf.expand_dims(resized_image, 0), None)
+
+    prediction = model.predict(prepared_image)
+    most_likely = np.argmax(prediction)
+    predicted_label = class_names[most_likely]
+    predicted_prob = prediction[0][most_likely]
+
+    return predicted_label, predicted_prob
+
+def predict_image_file(
+    model: tf.keras.Model, 
     file_name: str, 
     class_names: Iterable[str], 
-    true_label: str = None,
-    show_actual: bool = True):
-    """ Run a pretrained model prediction on an image file """
+    true_label: str = None):
+    """ Run a pretrained model prediction on an image file and display the result """
 
-    predict_images(model, [file_name], class_names, [true_label], show_actual)
+    predict_image_files(model, [file_name], class_names, [true_label])
 
-def predict_images(
+def predict_image_files(
     model: tf.keras.Model, 
     file_names: Iterable[str], 
     class_names: Iterable[str], 
-    true_labels: Iterable[str] = None,
-    show_actual: bool = True):
-    """ Run a pretrained model prediction on multiple image files """
+    true_labels: Iterable[str] = None):
+    """ Run a pretrained model prediction on multiple image files and display the result """
 
     for file_name, true_label in zip(file_names, true_labels):
         image = tf.image.decode_image(tf.io.read_file(file_name))
-        resized_image = tf.image.resize(image, IMAGE_SIZE)
-        prepared_image, _ = _preprocess(tf.expand_dims(resized_image, 0), None)
-
-        prediction = model.predict(prepared_image)
-        most_likely = np.argmax(prediction)
-        predicted_label = class_names[most_likely]
-        predicted_prob = prediction[0][most_likely]
+        predicted_label, predicted_prob = predict_image(model, image, class_names)
 
         plt.figure(file_name)
         plt.title(f'{true_label or "?"} <- {predicted_label} ({predicted_prob:.2%})')
-        if show_actual:
-            plt.imshow(tf.cast(image, tf.uint8))
-        else:
-            plt.imshow(prepared_image[0].numpy())
+        plt.imshow(tf.cast(image, tf.uint8))
         plt.axis('off')
 
     plt.show()
+
+def predict_dataset(model: tf.keras.Model, tfds: tf.data.Dataset) -> Tuple[tf.Tensor, tf.Tensor]:
+    """ Get predictions for TF dataset """
+
+    true_labels = [tf.argmax(labels) for _, labels in tfds.unbatch()]
+    true_labels = tf.stack(true_labels, axis=0)
+
+    predicted_labels = model.predict(tfds)
+    predicted_labels = tf.concat(predicted_labels, axis=0)
+    predicted_labels = tf.argmax(predicted_labels, axis=1)
+
+    return true_labels, predicted_labels
 
 def show_prediction_samples(
     model: tf.keras.Model, 
@@ -182,14 +199,3 @@ def filter_dataset_by_label(tfds: tf.data.Dataset, class_names: Iterable[str], l
     label_index = class_names.index(label)
     return tfds.unbatch().filter(lambda _, label: tf.equal(tf.math.argmax(label), label_index)).batch(BATCH_SIZE)
 
-def get_predictions(model: tf.keras.Model, tfds: tf.data.Dataset) -> Tuple[tf.Tensor, tf.Tensor]:
-    """ Get predictions for TF dataset """
-
-    true_labels = [tf.argmax(labels) for _, labels in tfds.unbatch()]
-    true_labels = tf.stack(true_labels, axis=0)
-
-    predicted_labels = model.predict(tfds)
-    predicted_labels = tf.concat(predicted_labels, axis=0)
-    predicted_labels = tf.argmax(predicted_labels, axis=1)
-
-    return true_labels, predicted_labels

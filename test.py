@@ -16,8 +16,8 @@ from lib.image_dataset import (
     load_dataset, 
     show_prediction_samples,
     filter_dataset_by_label, 
-    predict_images,
-    get_predictions
+    predict_image_files,
+    predict_dataset
 )
 
 def get_file_label(file_name):
@@ -69,12 +69,12 @@ def main(argv):
     elif FLAGS.files:
         # prediction for given file(s)
         true_labels = [get_file_label(fn) for fn in FLAGS.files]
-        predict_images(model, FLAGS.files, image_data.class_names, true_labels)
+        predict_image_files(model, FLAGS.files, image_data.class_names, true_labels)
 
     elif FLAGS.confusion:
         # plot confusion matrix
         # _, test_data = split_dataset(image_data)
-        true_labels, pred_labels = get_predictions(model, image_data.tfds)
+        true_labels, pred_labels = predict_dataset(model, image_data.tfds)
         plot_confusion_matrix(true_labels, pred_labels, image_data.class_names)
         
     else:
