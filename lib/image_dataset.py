@@ -2,6 +2,7 @@
 # Image loading and pre-processing functions (TF-dataset version)
 # (c) kol, 2022
 
+import os
 import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
@@ -119,7 +120,7 @@ def show_samples(tfds: tf.data.Dataset, class_names: Iterable[str], num_samples:
 def predict_image(
     model: tf.keras.Model, 
     image: np.ndarray, 
-    class_names: Iterable[str]):
+    class_names: Iterable[str]) -> Tuple[str, float]:
     """ Run a pretrained model prediction on an image """
 
     resized_image = tf.image.resize(image, IMAGE_SIZE)
@@ -127,10 +128,26 @@ def predict_image(
 
     prediction = model.predict(prepared_image, verbose=0)
     most_likely = np.argmax(prediction)
-    predicted_label = class_names[most_likely]
-    predicted_prob = prediction[0][most_likely]
+    label = class_names[most_likely]
+    prob = prediction[0][most_likely]
 
-    return predicted_label, predicted_prob
+    return label, prob
+
+def predict_image_probs(
+    model: tf.keras.Model, 
+    image: np.ndarray, 
+    class_names: Iterable[str]) -> Iterable[Tuple[str, float]]:
+    """ Run a pretrained model prediction on an image """
+
+    resized_image = tf.image.resize(image, IMAGE_SIZE)
+    prepared_image, _ = _preprocess(tf.expand_dims(resized_image, 0), None)
+
+    prediction = model.predict(prepared_image, verbose=0)
+    probs = []
+    for prob, pred in sorted(zip(prediction[0], range(len(prediction[0]))), key=lambda x: x[0], reverse=True):
+        label = class_names[pred]
+        probs.append((label, prob))
+    return probs
 
 def predict_image_file(
     model: tf.keras.Model, 
@@ -199,3 +216,5 @@ def filter_dataset_by_label(tfds: tf.data.Dataset, class_names: Iterable[str], l
     label_index = class_names.index(label)
     return tfds.unbatch().filter(lambda _, label: tf.equal(tf.math.argmax(label), label_index)).batch(BATCH_SIZE)
 
+def fast_get_class_names():
+    return [f for f in os.listdir(IMAGE_DIR) if os.path.isdir(os.path.join(IMAGE_DIR, f))]

@@ -4,13 +4,13 @@
 
 import cv2
 import numpy as np
-import matplotlib as plt
 import img_utils22 as imu
 
 SCREEN_SIZE = (480, 640)
 SCREEN_TITLE = 'Stream'
 ROI_WINDOW_TITLE = 'ROI'
 ROI_WINDOW_SIZE = (240, 320)
+ROI_AREA_SIZE = (210, 210)
 HIST_WINDOW_SIZE = (240, 320)
 HIST_WINDOW_TITLE = 'Histogram'
 FPS_RATE = 30
@@ -32,7 +32,7 @@ def show_roi_window(img: np.ndarray, caption: str):
         img = np.full(list(ROI_WINDOW_SIZE) + [3], imu.COLOR_GRAY, np.uint8)
     else:
         scale_y, scale_x = (ROI_WINDOW_SIZE[0]+20) / img.shape[0], (ROI_WINDOW_SIZE[1]+20) / img.shape[1]
-        img = imu.rescale(img, scale=min(scale_x, scale_y), center=True, pad_color=imu.COLOR_GRAY)
+        img = imu.rescale(img, scale=min(scale_x, scale_y), center=True, pad_color=imu.COLOR_WHITE)
         show_status(img, caption, important=True)
 
     cv2.imshow(ROI_WINDOW_TITLE, img)
@@ -83,19 +83,17 @@ def bgmask_to_bbox(bg_mask: np.ndarray) -> tuple:
     contour = contours[np.argmax(areas)]
     return cv2.boundingRect(contour)
 
-def get_bbox_area(img: np.ndarray, bbox: tuple, bbox_relax) -> np.ndarray:
-    if isinstance(bbox_relax, float):
-        dw, dh = int(bbox[2]*bbox_relax), int(bbox[3]*bbox_relax)
-    else:
-        dw, dh = bbox_relax, bbox_relax
-
+def extract_roi(img: np.ndarray, bbox: tuple, bbox_relax=0.2) -> np.ndarray:
+    dw, dh = int(bbox[2]*bbox_relax), int(bbox[3]*bbox_relax)
     bbox = [
         max(bbox[0] - dw, 0),
         max(bbox[1] - dh, 0),
         min(bbox[0] + bbox[2] + dw, img.shape[1]),
         min(bbox[1] + bbox[3] + dh, img.shape[0])
     ]
-    return imu.get_image_area(img, bbox)
+    roi = imu.get_image_area(img, bbox)
+    scale_y, scale_x = ROI_AREA_SIZE[0] / roi.shape[0], ROI_AREA_SIZE[1] / roi.shape[1]
+    return imu.rescale(roi, scale=min(scale_y, scale_x), center=True, pad_color=imu.COLOR_WHITE)
 
 def plot_hist(img_list: list) -> np.ndarray:
     from matplotlib.backends.backend_agg import FigureCanvasAgg

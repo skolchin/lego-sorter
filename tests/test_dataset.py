@@ -16,6 +16,7 @@ from lib.image_dataset import (
     show_samples,
     split_dataset, 
     augment_dataset,
+    fast_get_class_names,
 )
 
 def get_labels(tag, tfds, class_names):
@@ -34,6 +35,12 @@ def get_labels(tag, tfds, class_names):
 
 def main(argv):
     image_data = load_dataset()
+    class_names = fast_get_class_names()
+    if image_data.class_names != class_names:
+        print(f'Class names are different:\n\tdataset: {image_data.class_names}\n\tfast: {class_names}')
+    classes_diff = set(image_data.class_names).symmetric_difference(class_names)
+    if classes_diff:
+        print(f'Classes non matched: {classes_diff}')
 
     train_data, test_data = split_dataset(image_data)
     aug_data = augment_dataset(test_data)

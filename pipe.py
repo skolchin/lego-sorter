@@ -12,13 +12,13 @@ logging.basicConfig(format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-import lib.globals
+from lib.globals import OUTPUT_DIR
 from lib.pipe_utils import *
 from lib.model import load_model, make_model
-from lib.image_dataset import load_dataset,  predict_image
+from lib.image_dataset import fast_get_class_names, predict_image
 
 FLAGS = flags.FLAGS
-flags.DEFINE_float('bbox_relax', 0.2, help='ROI bbox relax coefficient')
+flags.DEFINE_string('bg_file', None, help='Use static background picture from file', short_name='b')
 flags.declare_key_flag('gray')
 flags.declare_key_flag('edges')
 
@@ -27,13 +27,12 @@ def main(argv):
     show_welcome_screen()
     cv2.waitKey(10)
 
-    image_data = load_dataset()
-    num_labels = len(image_data.class_names)
-    model = make_model(num_labels)
+    class_names = fast_get_class_names()
+    model = make_model(len(class_names))
     load_model(model)
 
-    blank_image = np.full(list(SCREEN_SIZE) + [3], imu.COLOR_BLACK, np.uint8)
-    predict_image(model, blank_image, image_data.class_names)
+    frame = np.full(list(SCREEN_SIZE) + [3], imu.COLOR_BLACK, np.uint8)
+    predict_image(model, frame, class_names)
 
     cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     if not cam.isOpened():
@@ -52,6 +51,7 @@ def main(argv):
     back_sub = None
     video_out = None
     debug_show = False
+    eq_filter = imu.EqualizeLuminosity()
 
     while True:
         ret, frame = cam.read()
@@ -62,12 +62,13 @@ def main(argv):
         if frame_count % FPS_RATE == 0:
             roi = None
             if back_sub is not None:
-                bgmask = back_sub.apply(frame, learningRate=0)
+                eq_frame = eq_filter(frame)
+                bgmask = back_sub.apply(eq_frame, learningRate=0)
                 frame_bbox = bgmask_to_bbox(bgmask)
                 if frame_bbox is not None:
-                    roi = get_bbox_area(frame, frame_bbox, FLAGS.bbox_relax)
+                    roi = extract_roi(frame, frame_bbox)
                     roi_rgb = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
-                    label, prob = predict_image(model, roi_rgb, image_data.class_names)
+                    label, prob = predict_image(model, roi_rgb, class_names)
                     frame_caption = f'{label} ({prob:.2%})'
 
             if debug_show:
@@ -95,14 +96,15 @@ def main(argv):
 
             case 98:    # b
                 if back_sub is None:
+                    eq_frame = eq_filter(frame)
                     back_sub = cv2.createBackgroundSubtractorMOG2(history=10, varThreshold=10, detectShadows=True)
-                    back_sub.apply(frame, learningRate=-1)
+                    back_sub.apply(eq_frame, learningRate=-1)
                 else:
                     back_sub = None
 
             case 99:    # c
                 if video_out is None:
-                    fn = os.path.join('out', f'pipe_{datetime.now().strftime("%y%m%d_%H%M%S")}.mp4')
+                    fn = os.path.join(OUTPUT_DIR, f'pipe_{datetime.now().strftime("%y%m%d_%H%M%S")}.mp4')
                     logger.info('Starting video output to %s', fn)
                     video_out = cv2.VideoWriter(fn, cv2.VideoWriter_fourcc(*'mp4v'), 30.0, tuple(reversed(SCREEN_SIZE)))
                 else:
