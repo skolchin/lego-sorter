@@ -125,7 +125,7 @@ def predict_image(
     resized_image = tf.image.resize(image, IMAGE_SIZE)
     prepared_image, _ = _preprocess(tf.expand_dims(resized_image, 0), None)
 
-    prediction = model.predict(prepared_image)
+    prediction = model.predict(prepared_image, verbose=0)
     most_likely = np.argmax(prediction)
     predicted_label = class_names[most_likely]
     predicted_prob = prediction[0][most_likely]
