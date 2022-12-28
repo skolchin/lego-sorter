@@ -10,37 +10,48 @@ import matplotlib.pyplot as plt
 from absl import flags
 from keras.utils import image_dataset_from_directory
 from collections import namedtuple
+from functools import partial
 from typing import Tuple, Iterable
 
 from lib.globals import IMAGE_DIR, BATCH_SIZE, IMAGE_SIZE
 from lib.model import preprocess_input
 
 FLAGS = flags.FLAGS
+flags.DEFINE_boolean('zoom', False, short_name='z', 
+    help='Apply zoom augmentation (slows down the training by x5)')
+flags.DEFINE_float('zoom_factor', 0.2, help='Maximum zoom level for image augmentation')
+flags.DEFINE_float('brightness_factor', 0.3, help='Maximum brightness level for image augmentation')
+flags.DEFINE_float('rotation_factor', 0.45, help='Maximum rotation in image augmentation')
+
+tf.get_logger().setLevel('ERROR')
 
 ImageDataset = namedtuple('ImageDataset', ['tfds', 'num_files', 'class_names'])
-""" Image dataset wrapper """
+""" Dataset with extra info """
 
-def _preprocess(images, labels=None):
-    result = preprocess_input(images)
+def _preprocess(images, labels=None, seed=None):
+    """ Combined image preprocessing function """
+    images = preprocess_input(images)
+
     if FLAGS.gray:
-        result = tf.image.rgb_to_grayscale(result)
-    result = tf.image.convert_image_dtype(result, tf.float32)
+        images = tf.image.rgb_to_grayscale(images)
+
     if FLAGS.edges:
-        result_shape = result.shape
-        if len(result_shape) == 3: result = tf.expand_dims(result, 0)
-        grad_components = tf.image.sobel_edges(result)
+        shape = images.shape
+        if len(shape) == 3: images = tf.expand_dims(images, 0)
+        grad_components = tf.image.sobel_edges(images)
         grad_mag_components = grad_components**2
         grad_mag_square = tf.math.reduce_sum(grad_mag_components,axis=-1)
-        result = tf.sqrt(grad_mag_square)
-        if len(result_shape) == 3: result = result[0]
-    return result, labels
+        images = tf.sqrt(grad_mag_square)
+        if len(shape) == 3: images = images[0]
+
+    return images, labels
 
 # https://towardsdatascience.com/image-augmentations-in-tensorflow-62967f59239d
 @tf.function
 def _augment_images(image_and_label, seed):
     image, label = image_and_label
     new_seed = tf.random.experimental.stateless_split(seed, num=1)[0, :]
-    # image = tf.image.stateless_random_brightness(image, max_delta=0.3, seed=new_seed)
+    image = tf.image.stateless_random_brightness(image, max_delta=FLAGS.brightness_factor, seed=new_seed)
     image = tf.image.stateless_random_flip_left_right(image, seed=new_seed)
     image = tf.image.stateless_random_flip_up_down(image, seed=new_seed)
     return image, label, seed
@@ -49,11 +60,21 @@ def _augment_images(image_and_label, seed):
 def _rotate_images(feature, label, seed):
     num_samples = int(tf.shape(feature)[0])
     degrees = tf.random.stateless_uniform(
-        shape=(num_samples,), seed=seed, minval=-45, maxval=45
+        shape=(num_samples,), seed=seed, minval=FLAGS.rotation_factor*100, maxval=FLAGS.rotation_factor*100
     )
     degrees = degrees * 0.017453292519943295  # convert the angle in degree to radians
     rotated_images = tfa.image.rotate(feature, degrees, fill_mode='reflect')
     return rotated_images, label, seed
+
+@tf.function
+def _zoom_images(feature, label, seed):
+    def _func(images, seed):
+        return tf.keras.layers.RandomZoom(
+                    (-FLAGS.zoom_factor, FLAGS.zoom_factor),
+                    (-FLAGS.zoom_factor, FLAGS.zoom_factor),
+                    fill_mode='nearest', interpolation='nearest', seed=seed)(images)
+    zoomed_images = tf.py_function(func=_func, inp=[feature, seed], Tout=tf.float32)
+    return zoomed_images, label, seed
 
 @tf.function
 def _drop_seed(feature, label, seed):
@@ -69,14 +90,15 @@ def load_dataset() -> ImageDataset:
         batch_size=None,
         image_size=IMAGE_SIZE,
         shuffle=False,
-        crop_to_aspect_ratio=False,
+        crop_to_aspect_ratio=True,
         seed=seed,
     )
     num_files = len(ds.file_paths)
     return ImageDataset(
         ds.shuffle(buffer_size=int(num_files/4), reshuffle_each_iteration=False, seed=seed) \
-            .map(_preprocess) \
-            .batch(BATCH_SIZE), 
+            .map(partial(_preprocess, seed=seed)) \
+            .batch(BATCH_SIZE) \
+            .prefetch(tf.data.AUTOTUNE), 
         num_files,
         ds.class_names.copy()
     )
@@ -93,6 +115,8 @@ def augment_dataset(tfds: tf.data.Dataset) -> tf.data.Dataset:
     tfds_with_seed = tf.data.Dataset.zip((tfds, (counter, counter)))
     augmented_dataset = tfds_with_seed.map(_augment_images)
     augmented_dataset = augmented_dataset.map(_rotate_images)
+    if FLAGS.zoom:
+        augmented_dataset = augmented_dataset.map(_zoom_images)
     augmented_dataset = augmented_dataset.map(_drop_seed)
     return augmented_dataset
 
@@ -111,7 +135,7 @@ def show_samples(tfds: tf.data.Dataset, class_names: Iterable[str], num_samples:
     for images, labels in get_dataset_samples(tfds):
         for i in range(num_samples):
             _ = plt.subplot(int(num_samples/3), int(num_samples/3), i + 1)
-            plt.imshow(images[i].numpy())
+            plt.imshow(images[i].numpy().astype('uint8'))
             label = np.argmax(labels[i])
             plt.title(class_names[label])
             plt.axis('off')
@@ -123,8 +147,8 @@ def predict_image(
     class_names: Iterable[str]) -> Tuple[str, float]:
     """ Run a pretrained model prediction on an image """
 
-    resized_image = tf.image.resize(image, IMAGE_SIZE)
-    prepared_image, _ = _preprocess(tf.expand_dims(resized_image, 0), None)
+    resized_image = tf.keras.preprocessing.image.smart_resize(image, IMAGE_SIZE)
+    prepared_image, _ = _preprocess(tf.expand_dims(resized_image, 0))
 
     prediction = model.predict(prepared_image, verbose=0)
     most_likely = np.argmax(prediction)
@@ -139,8 +163,8 @@ def predict_image_probs(
     class_names: Iterable[str]) -> Iterable[Tuple[str, float]]:
     """ Run a pretrained model prediction on an image """
 
-    resized_image = tf.image.resize(image, IMAGE_SIZE)
-    prepared_image, _ = _preprocess(tf.expand_dims(resized_image, 0), None)
+    resized_image = tf.keras.preprocessing.image.smart_resize(image, IMAGE_SIZE)
+    prepared_image, _ = _preprocess(tf.expand_dims(resized_image, 0))
 
     prediction = model.predict(prepared_image, verbose=0)
     probs = []
@@ -171,7 +195,7 @@ def predict_image_files(
 
         plt.figure(file_name)
         plt.title(f'{true_label or "?"} <- {predicted_label} ({predicted_prob:.2%})')
-        plt.imshow(tf.cast(image, tf.uint8))
+        plt.imshow(image.astype('uint8'))
         plt.axis('off')
 
     plt.show()
@@ -207,14 +231,15 @@ def show_prediction_samples(
             predicted_prob = prediction[0][most_likely]
 
             plt.title(f'{label} <- {predicted_label} ({predicted_prob:.2%})')
-            plt.imshow(image)
+            plt.imshow(image.astype('uint8'))
             plt.axis('off')
     plt.show()
 
 def filter_dataset_by_label(tfds: tf.data.Dataset, class_names: Iterable[str], label: str) -> tf.data.Dataset:
-    """ Return a TF dataset subset containing images of given label only """
+    """ Return a dataset subset containing images of given label only """
     label_index = class_names.index(label)
     return tfds.unbatch().filter(lambda _, label: tf.equal(tf.math.argmax(label), label_index)).batch(BATCH_SIZE)
 
 def fast_get_class_names():
+    """ Faster way of getting image class names """
     return [f for f in os.listdir(IMAGE_DIR) if os.path.isdir(os.path.join(IMAGE_DIR, f))]

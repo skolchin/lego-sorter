@@ -5,7 +5,7 @@
 import os
 from absl import flags
 
-flags.DEFINE_bool('gray', True, short_name='g', help='Use grayscaled images')
+flags.DEFINE_bool('gray', False, short_name='g', help='Use grayscaled images')
 flags.DEFINE_bool('edges', False, short_name='e', help='Use edge-highlited images')
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.split(__file__)[0], '..'))

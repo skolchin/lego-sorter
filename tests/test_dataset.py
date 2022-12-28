@@ -5,19 +5,22 @@
 import numpy as np
 import pandas as pd
 from absl import app, flags
+from time import time
 from root_dir import ROOT_DIR
 
 import lib.globals
-flags.declare_key_flag('gray')
-flags.declare_key_flag('edges')
-
 from lib.image_dataset import (
     load_dataset, 
     show_samples,
     split_dataset, 
     augment_dataset,
+    get_dataset_samples,
     fast_get_class_names,
 )
+
+flags.declare_key_flag('gray')
+flags.declare_key_flag('edges')
+flags.declare_key_flag('zoom')
 
 def get_labels(tag, tfds, class_names):
     real_labels = []
@@ -33,17 +36,30 @@ def get_labels(tag, tfds, class_names):
             })
     return real_labels
 
+def measure_time(func: callable, *args, **kwargs):
+    tm = time()
+    ret = func(*args, **kwargs)
+    print(f'Function {repr(func).split(" ")[1]} call took {time() - tm:.2f} seconds')
+    return ret
+
+def run_dataset_enum(tfds):
+    for images, labels in get_dataset_samples(tfds, 5):
+        for _ in zip(images, labels): pass
+
 def main(argv):
-    image_data = load_dataset()
+    image_data = measure_time(load_dataset)
     class_names = fast_get_class_names()
+
     if image_data.class_names != class_names:
         print(f'Class names are different:\n\tdataset: {image_data.class_names}\n\tfast: {class_names}')
     classes_diff = set(image_data.class_names).symmetric_difference(class_names)
     if classes_diff:
         print(f'Classes non matched: {classes_diff}')
 
-    train_data, test_data = split_dataset(image_data)
-    aug_data = augment_dataset(test_data)
+    train_data, test_data = measure_time(split_dataset,image_data)
+    aug_data = measure_time(augment_dataset, test_data)
+    measure_time(run_dataset_enum, aug_data)
+
     show_samples(aug_data, image_data.class_names)
 
     real_labels = \

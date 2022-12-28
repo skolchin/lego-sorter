@@ -2,8 +2,11 @@
 # Model training script
 # (c) kol, 2022
 
+import logging
 import matplotlib.pyplot as plt
 from absl import app, flags
+
+logging.basicConfig(format='%(levelname)s: %(message)s')
 
 import lib.globals
 from lib.model import (
@@ -37,6 +40,7 @@ flags.DEFINE_boolean('show', default=True, help='Show image samples and plots')
 flags.DEFINE_boolean('save', default=True, help='Save model to disk')
 flags.declare_key_flag('gray')
 flags.declare_key_flag('edges')
+flags.declare_key_flag('zoom')
 
 def main(argv):
     """ Train the LEGO Sorter model """

@@ -7,7 +7,13 @@ import cv2
 import logging
 import numpy as np
 import img_utils22 as imu
-from root_dir import OUT_DIR
+from absl import app, flags
+
+import root_dir
+from lib.globals import OUTPUT_DIR
+from lib.pipe_utils import *
+from lib.model import load_model, make_model
+from lib.image_dataset import fast_get_class_names, predict_image
 
 logging.basicConfig(format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
@@ -197,21 +203,33 @@ def extract_object(img1,
     return img1
 
 
-def main():
+def main(argv):
     # source = cv2.imread('out\\3003_test.png')
     # imu.imshow(source, 'source')
     # result = extract_object(source, method='luminosity')
     # imu.imshow(result, 'result')
     # (314, 273, 204, 212)
 
-    source = cv2.imread(os.path.join(OUT_DIR,'photo_2022-12-16_21-05-36.jpg'))
+    source = cv2.imread(os.path.join(OUTPUT_DIR,'frame_506.png'))
     imu.imshow(source, 'source', (600, 800))
 
-    result = extract_object(source, method='multichannel', extract_roi=True, roi_size=(480, 640), replace_bgclr=None)
-    imu.imshow(result, 'result')
+    image = extract_object(source, method='multichannel', extract_roi=True, bbox_relax=0.3, replace_bgclr=None)
+    image = imu.rescale(image, scale=2.0, center=True, pad_color=imu.COLOR_WHITE)
 
-    resized = imu.rescale(result, scale=1.5, center=True, pad_color=imu.COLOR_WHITE)
+    class_names = fast_get_class_names()
+    model = make_model(len(class_names))
+    load_model(model)
+
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    label, prob = predict_image(model, image_rgb, class_names)
+    caption = f'{label} ({prob:.2%})'
+    logger.info(f'Image recognized as {caption}')
+
+    imu.imshow(image, caption)
+
+    # resized = imu.rescale(result, scale=1.5, center=True, pad_color=imu.COLOR_WHITE)
     # cv2.imwrite(os.path.join(OUT_DIR,'out\\3003_test3.png'), resized)
 
 if __name__ == '__main__':
-    main()
+    app.run(main)
+
