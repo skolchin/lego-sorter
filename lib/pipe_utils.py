@@ -136,7 +136,7 @@ def extract_roi(frame: np.ndarray, bbox: Tuple[int], bbox_relax=0.2) -> np.ndarr
     # scale_y, scale_x = ROI_AREA_SIZE[0] / roi.shape[0], ROI_AREA_SIZE[1] / roi.shape[1]
     # logger.debug(f'Scales: {scale_y} / {scale_x}')
     # roi = imu.resize(roi, scale=0.5)
-    # roi = imu.rescale(roi, new_size=640)
+    roi = imu.rescale(roi, new_size=480, center=True, pad_color=imu.COLOR_WHITE)
     return roi
 
 def plot_hist(img_list: list, wsize: Tuple[int], log_scale: bool = False) -> np.ndarray:

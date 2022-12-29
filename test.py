@@ -51,6 +51,8 @@ flags.DEFINE_string('label', None, 'Predict for specific label', short_name='c')
 flags.DEFINE_boolean('confusion', None, 'Plot confusion matrix', short_name='m')
 flags.declare_key_flag('gray')
 flags.declare_key_flag('edges')
+flags.declare_key_flag('zoom')
+flags.declare_key_flag('emboss')
 
 def main(argv):
     """ Test the LEGO Sorter model """

@@ -22,15 +22,15 @@ flags.DEFINE_float('label_smoothing', 0.01, help='Label smoothing')
 def make_model(num_labels: int) -> tf.keras.Model:
     """ Make and compile a Keras model """
 
-    if not FLAGS.gray:
-        input_shape = list(IMAGE_SIZE) + [3]
-        input_layer = tf.keras.layers.Input(input_shape)
-        last_layer = input_layer
-    else:
+    if FLAGS.gray:
         input_shape = list(IMAGE_SIZE) + [1]
         input_layer = tf.keras.layers.Input(input_shape)
         concat_layer = tf.keras.layers.Concatenate()([input_layer, input_layer, input_layer])
         last_layer = concat_layer
+    else:
+        input_shape = list(IMAGE_SIZE) + [3]
+        input_layer = tf.keras.layers.Input(input_shape)
+        last_layer = input_layer
 
     vgg16 = VGG16(weights='imagenet', include_top=False, input_tensor=last_layer)
     vgg16.trainable = False
@@ -70,18 +70,13 @@ def make_model(num_labels: int) -> tf.keras.Model:
     model.build([None] + list(input_shape))
     return model
 
-def _checkpoint_subdir():
-    match (FLAGS.gray, FLAGS.edges):
-        case (True, True):
-            return 'gray_edges'
-        case (True, False):
-            return 'gray'
-        case (False, True):
-            return 'color_edges'
-        case (False, False):
-            return 'color'
+def _checkpoint_subdir() -> str:
+    subdir = 'gray' if FLAGS.gray else 'emboss' if FLAGS.emboss else 'color'
+    if FLAGS.edges: subdir += '_edges'
+    if FLAGS.zoom: subdir += '_zoom'
+    return subdir
 
-def checkpoint_callback():
+def checkpoint_callback() -> tf.keras.callbacks.Callback:
     """ Build a callback to save model weigth checkpoints while fitting a model """
 
     return tf.keras.callbacks.ModelCheckpoint(

@@ -17,9 +17,7 @@ from lib.globals import IMAGE_DIR, BATCH_SIZE, IMAGE_SIZE
 from lib.model import preprocess_input
 
 FLAGS = flags.FLAGS
-flags.DEFINE_boolean('zoom', False, short_name='z', 
-    help='Apply zoom augmentation (slows down the training by x5)')
-flags.DEFINE_float('zoom_factor', 0.2, help='Maximum zoom level for image augmentation')
+flags.DEFINE_float('zoom_factor', 0.3, help='Maximum zoom level for image augmentation')
 flags.DEFINE_float('brightness_factor', 0.3, help='Maximum brightness level for image augmentation')
 flags.DEFINE_float('rotation_factor', 0.45, help='Maximum rotation in image augmentation')
 
@@ -28,21 +26,30 @@ tf.get_logger().setLevel('ERROR')
 ImageDataset = namedtuple('ImageDataset', ['tfds', 'num_files', 'class_names'])
 """ Dataset with extra info """
 
+def _sobel_edges(images):
+    shape = images.shape
+    if len(shape) == 3: images = tf.expand_dims(images, 0)
+    grad_components = tf.image.sobel_edges(images)
+    grad_mag_components = grad_components**2
+    grad_mag_square = tf.math.reduce_sum(grad_mag_components,axis=-1)
+    images = tf.sqrt(grad_mag_square)
+    if len(shape) == 3: images = images[0]
+    return images
+
 def _preprocess(images, labels=None, seed=None):
-    """ Combined image preprocessing function """
+    """ Image preprocessing function """
     images = preprocess_input(images)
 
-    if FLAGS.gray:
-        images = tf.image.rgb_to_grayscale(images)
-
-    if FLAGS.edges:
-        shape = images.shape
-        if len(shape) == 3: images = tf.expand_dims(images, 0)
-        grad_components = tf.image.sobel_edges(images)
-        grad_mag_components = grad_components**2
-        grad_mag_square = tf.math.reduce_sum(grad_mag_components,axis=-1)
-        images = tf.sqrt(grad_mag_square)
-        if len(shape) == 3: images = images[0]
+    if FLAGS.emboss:
+        gray_images = tf.image.rgb_to_grayscale(images)
+        sobel_images = _sobel_edges(gray_images)
+        images = tf.concat([gray_images, gray_images, sobel_images], axis=-1)
+        images = tf.clip_by_value(images, 0.0, 255.0)   # 255.0 is VGG-16 max value
+    else:
+        if FLAGS.gray:
+            images = tf.image.rgb_to_grayscale(images)
+        if FLAGS.edges:
+            images = _sobel_edges(images)
 
     return images, labels
 

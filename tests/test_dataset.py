@@ -21,6 +21,7 @@ from lib.image_dataset import (
 flags.declare_key_flag('gray')
 flags.declare_key_flag('edges')
 flags.declare_key_flag('zoom')
+flags.declare_key_flag('emboss')
 
 def get_labels(tag, tfds, class_names):
     real_labels = []

@@ -5,8 +5,14 @@
 import os
 from absl import flags
 
-flags.DEFINE_bool('gray', False, short_name='g', help='Use grayscaled images')
-flags.DEFINE_bool('edges', False, short_name='e', help='Use edge-highlited images')
+flags.DEFINE_bool('gray', False, short_name='g', 
+    help='Convert images to grayscale')
+flags.DEFINE_bool('edges', False, short_name='e', 
+    help='Convert images to wireframe (edges-only) images')
+flags.DEFINE_bool('emboss', False, short_name='x', 
+    help='Highlight edges by combining grayscale and wireframe augmentations')
+flags.DEFINE_boolean('zoom', False, short_name='z', 
+    help='Apply zoom augmentation (slows down the training by x5)')
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.split(__file__)[0], '..'))
 """ Root dir """

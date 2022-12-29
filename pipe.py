@@ -22,6 +22,7 @@ flags.DEFINE_boolean('equalize_luminosity', False,
     help='Apply luminosity equalization filter', short_name='eq')
 flags.declare_key_flag('gray')
 flags.declare_key_flag('edges')
+flags.declare_key_flag('zoom')
 
 HELP_CAPTURE = 'Remove any objects and press B to capture background'
 HELP_INFO = 'Press ESC or Q to quit, S for camera settings, C for video capture'
@@ -85,11 +86,12 @@ def main(argv):
                 roi_label, roi_prob = labels_probs[0]
                 roi_caption = f'{roi_label} ({roi_prob:.2%})'
                 ref = get_ref_image(roi_label)
+                if show_preprocessed:
+                    roi = preprocess_image(roi)
+                    ref = preprocess_image(ref)
 
         if show_preprocessed:
             frame = preprocess_image(frame)
-            roi = preprocess_image(roi)
-            ref = preprocess_image(ref)
         else:
             status_info.apply(frame)
             if roi_bbox is not None:
@@ -139,6 +141,7 @@ def main(argv):
                 if show_debug: 
                     hide_hist_window()
                     hide_roi_window()
+                    hide_ref_window()
                 show_debug = not show_debug
                 logger.setLevel(logging.DEBUG if show_debug else logging.INFO)
 
