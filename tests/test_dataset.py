@@ -49,6 +49,12 @@ def run_dataset_enum(tfds):
 
 def main(argv):
     image_data = measure_time(load_dataset)
+    train_data, test_data = measure_time(split_dataset,image_data)
+    aug_data = measure_time(augment_dataset, test_data)
+
+    show_samples(aug_data, image_data.class_names)
+    return
+
     class_names = fast_get_class_names()
 
     if image_data.class_names != class_names:
@@ -57,12 +63,7 @@ def main(argv):
     if classes_diff:
         print(f'Classes non matched: {classes_diff}')
 
-    train_data, test_data = measure_time(split_dataset,image_data)
-    aug_data = measure_time(augment_dataset, test_data)
     measure_time(run_dataset_enum, aug_data)
-
-    show_samples(aug_data, image_data.class_names)
-
     real_labels = \
         get_labels('train', train_data, image_data.class_names) + \
         get_labels('test', test_data, image_data.class_names)

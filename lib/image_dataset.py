@@ -20,6 +20,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_float('zoom_factor', 0.3, help='Maximum zoom level for image augmentation')
 flags.DEFINE_float('brightness_factor', 0.3, help='Maximum brightness level for image augmentation')
 flags.DEFINE_float('rotation_factor', 0.45, help='Maximum rotation in image augmentation')
+flags.DEFINE_integer('edge_emboss', 1, lower_bound=0, help='Edge embossing factor')
 
 tf.get_logger().setLevel('ERROR')
 
@@ -36,20 +37,35 @@ def _sobel_edges(images):
     if len(shape) == 3: images = images[0]
     return images
 
+def _wireframe(images):
+    shape = images.shape
+    if len(shape) == 3: images = tf.expand_dims(images, 0)
+
+    gray_images = tf.image.rgb_to_grayscale(images)
+    sobel_images = _sobel_edges(gray_images)
+
+    mask = tf.where(sobel_images < 127.5, 0.0, 255.0)   # VGG-16 operates on [0...255] range
+    if FLAGS.edge_emboss > 0:
+        kernel = tf.zeros((3, 3, mask.get_shape()[3]))
+        dilation = (1, FLAGS.edge_emboss, FLAGS.edge_emboss, 1)
+        mask = tf.nn.dilation2d(mask, kernel, (1,1,1,1), 'SAME', 'NHWC', dilation, 'dilation')
+
+    if len(shape) == 3: mask = mask[0]
+    return mask
+
 def _preprocess(images, labels=None, seed=None):
     """ Image preprocessing function """
     images = preprocess_input(images)
 
     if FLAGS.emboss:
-        gray_images = tf.image.rgb_to_grayscale(images)
-        sobel_images = _sobel_edges(gray_images)
-        images = tf.concat([gray_images, gray_images, sobel_images], axis=-1)
-        images = tf.clip_by_value(images, 0.0, 255.0)   # 255.0 is VGG-16 max value
-    else:
+        mask = _wireframe(images)
+        images = tf.where(tf.equal(mask, 0.0), images, tf.constant((0.0, 0.0, 255.0), images.dtype))
         if FLAGS.gray:
             images = tf.image.rgb_to_grayscale(images)
-        if FLAGS.edges:
-            images = _sobel_edges(images)
+    elif FLAGS.gray:
+        images = tf.image.rgb_to_grayscale(images)
+    elif FLAGS.edges:
+        images = _wireframe(images)
 
     return images, labels
 
@@ -139,10 +155,11 @@ def get_dataset_samples(tfds: tf.data.Dataset, num_batches: int = 1) -> tf.data.
 def show_samples(tfds: tf.data.Dataset, class_names: Iterable[str], num_samples: int = 9):
     """ Show random image samples from TF dataset """
     plt.figure(figsize=(8, 8))
+    cmap = 'gray' if FLAGS.gray or FLAGS.edges else None
     for images, labels in get_dataset_samples(tfds):
         for i in range(num_samples):
             _ = plt.subplot(int(num_samples/3), int(num_samples/3), i + 1)
-            plt.imshow(images[i].numpy().astype('uint8'))
+            plt.imshow(images[i].numpy().astype('uint8'), cmap=cmap)
             label = np.argmax(labels[i])
             plt.title(class_names[label])
             plt.axis('off')
@@ -196,13 +213,14 @@ def predict_image_files(
     true_labels: Iterable[str] = None):
     """ Run a pretrained model prediction on multiple image files and display the result """
 
+    cmap = 'gray' if FLAGS.gray or FLAGS.edges else None
     for file_name, true_label in zip(file_names, true_labels):
         image = tf.image.decode_image(tf.io.read_file(file_name))
         predicted_label, predicted_prob = predict_image(model, image, class_names)
 
         plt.figure(file_name)
         plt.title(f'{true_label or "?"} <- {predicted_label} ({predicted_prob:.2%})')
-        plt.imshow(image.astype('uint8'))
+        plt.imshow(image.astype('uint8'), cmap=cmap)
         plt.axis('off')
 
     plt.show()
@@ -227,6 +245,7 @@ def show_prediction_samples(
     """ Show prediction samples from test dataset """
     
     plt.figure(figsize=(8, 8))
+    cmap = 'gray' if FLAGS.gray or FLAGS.edges else None
     for images, labels in get_dataset_samples(tfds):
         for i in range(num_samples):
             _ = plt.subplot(int(num_samples/3), int(num_samples/3), i + 1)
@@ -238,7 +257,7 @@ def show_prediction_samples(
             predicted_prob = prediction[0][most_likely]
 
             plt.title(f'{label} <- {predicted_label} ({predicted_prob:.2%})')
-            plt.imshow(image.astype('uint8'))
+            plt.imshow(image.astype('uint8'), cmap=cmap)
             plt.axis('off')
     plt.show()
 

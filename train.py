@@ -12,7 +12,8 @@ import lib.globals
 from lib.model import (
     make_model, 
     load_model, 
-    checkpoint_callback, 
+    get_checkpoint_callback, 
+    get_early_stopping_callback,
     cleanup_checkpoints
 )
 
@@ -58,9 +59,9 @@ def main(argv):
     model.summary()
 
     if not FLAGS.save:
-        callbacks_list = []
+        callbacks_list = [get_early_stopping_callback()]
     else:
-        callbacks_list = [checkpoint_callback()]
+        callbacks_list = [get_early_stopping_callback(), get_checkpoint_callback()]
         load_model(model)
 
     history = model.fit(

@@ -21,7 +21,6 @@ FRAME_SIZE = (480, 640)
 FRAME_WINDOW_TITLE = 'Frame'
 ROI_WINDOW_TITLE = 'ROI'
 ROI_WINDOW_SIZE = (240, 320)
-ROI_AREA_SIZE = (240, 240)
 HIST_WINDOW_SIZE = (240, 320)
 HIST_WINDOW_TITLE = 'Histogram'
 REF_WINDOW_SIZE = (240, 320)
@@ -50,9 +49,11 @@ def show_roi_window(img: np.ndarray, caption: str, contour: Iterable = None, wsi
         y = max(int((canvas.shape[0]-20)/2 - img.shape[0]/2), 0)
         x = max(int(canvas.shape[1]/2 - img.shape[1]/2), 0)
         try:
+            if len(img.shape) == 2: 
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
             canvas = imu.patch(canvas, x, y, img, clip=True)
-        except:
-            pass
+        except Exception as ex:
+            logger.exception('Error %s', ex, exc_info=1)
         StatusInfo().assign_and_apply(canvas, caption, important=True)
 
     cv2.imshow(ROI_WINDOW_TITLE, canvas)
@@ -113,17 +114,18 @@ def bgmask_to_bbox_contour(bg_mask: np.ndarray) -> Tuple[Tuple[int], Iterable]:
     contours, _ = cv2.findContours(bg_mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
     if not len(contours):
         return None, None
-    logger.debug(f'{len(contours)} contours detected')
 
     areas = [cv2.contourArea(c) for c in contours]
     contour = contours[np.argmax(areas)]
     bbox = cv2.boundingRect(contour)
+    logger.debug(f'{len(contours)} contours detected, max bbox is {bbox}')
+
     return bbox, contour
 
 def bgmask_to_bbox(bg_mask: np.ndarray) -> Tuple[int]:
     return bgmask_to_bbox_contour(bg_mask)[0]
 
-def extract_roi(frame: np.ndarray, bbox: Tuple[int], bbox_relax=0.2) -> np.ndarray:
+def extract_roi(frame: np.ndarray, bbox: Tuple[int], bbox_relax=0.2, zoom_level=2.0) -> np.ndarray:
     dw, dh = int(bbox[2]*bbox_relax), int(bbox[3]*bbox_relax)
     bbox = [
         max(bbox[0] - dw, 0),
@@ -131,12 +133,10 @@ def extract_roi(frame: np.ndarray, bbox: Tuple[int], bbox_relax=0.2) -> np.ndarr
         min(bbox[0] + bbox[2] + dw, frame.shape[1]),
         min(bbox[1] + bbox[3] + dh, frame.shape[0])
     ]
-    logger.debug(f'Enlarged bbox: {bbox}')
+    logger.debug(f'Normalized bbox: {bbox}')
     roi = imu.get_image_area(frame, bbox)
-    # scale_y, scale_x = ROI_AREA_SIZE[0] / roi.shape[0], ROI_AREA_SIZE[1] / roi.shape[1]
-    # logger.debug(f'Scales: {scale_y} / {scale_x}')
-    # roi = imu.resize(roi, scale=0.5)
-    roi = imu.rescale(roi, new_size=480, center=True, pad_color=imu.COLOR_WHITE)
+    if zoom_level > 0.0:
+        roi = imu.rescale(roi, scale=zoom_level, center=True, pad_color=imu.COLOR_WHITE)
     return roi
 
 def plot_hist(img_list: list, wsize: Tuple[int], log_scale: bool = False) -> np.ndarray:

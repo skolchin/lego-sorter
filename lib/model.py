@@ -22,7 +22,7 @@ flags.DEFINE_float('label_smoothing', 0.01, help='Label smoothing')
 def make_model(num_labels: int) -> tf.keras.Model:
     """ Make and compile a Keras model """
 
-    if FLAGS.gray:
+    if FLAGS.gray or FLAGS.edges:
         input_shape = list(IMAGE_SIZE) + [1]
         input_layer = tf.keras.layers.Input(input_shape)
         concat_layer = tf.keras.layers.Concatenate()([input_layer, input_layer, input_layer])
@@ -70,27 +70,49 @@ def make_model(num_labels: int) -> tf.keras.Model:
     model.build([None] + list(input_shape))
     return model
 
-def _checkpoint_subdir() -> str:
-    subdir = 'gray' if FLAGS.gray else 'emboss' if FLAGS.emboss else 'color'
-    if FLAGS.edges: subdir += '_edges'
-    if FLAGS.zoom: subdir += '_zoom'
-    return subdir
+def _get_checkpoint_dir() -> str:
+    match (FLAGS.gray, FLAGS.edges, FLAGS.emboss):
+        case (False, False, False):
+            subdir = 'color'
+        case (True, False, False):
+            subdir = 'gray'
+        case (False, True, False):
+            subdir = 'edges'
+        case (False, False, True):
+            subdir = 'emboss'
+        case (True, False, True):
+            subdir = 'emboss_gray'
+        case _:
+            raise ValueError('Invalid flags combination')
 
-def checkpoint_callback() -> tf.keras.callbacks.Callback:
-    """ Build a callback to save model weigth checkpoints while fitting a model """
+    if FLAGS.zoom: subdir += '_zoom'
+    return os.path.join(CHECKPOINT_DIR, subdir)
+
+def get_checkpoint_callback() -> tf.keras.callbacks.Callback:
+    """ Build a callback to save weigths while fitting a model """
 
     return tf.keras.callbacks.ModelCheckpoint(
-        filepath=os.path.join(CHECKPOINT_DIR, _checkpoint_subdir(), 'cp-{epoch:04d}.ckpt'),
+        filepath=os.path.join(_get_checkpoint_dir(), 'cp-{epoch:04d}.ckpt'),
         save_weights_only=True,
         monitor='val_loss',
         mode='min',
         save_best_only=True,
         verbose=0)
 
+def get_early_stopping_callback() -> tf.keras.callbacks.Callback:
+    """ Build a callback to stop stale model fitting """
+
+    return tf.keras.callbacks.EarlyStopping(
+        monitor='val_loss',
+        mode='min',
+        patience=5,
+        restore_best_weights=True,
+        verbose=0)
+
 def load_model(model: tf.keras.Model) -> tf.keras.Model:
     """ Load a model weights from latest checkpoint """
 
-    cp_path = os.path.join(CHECKPOINT_DIR, _checkpoint_subdir())
+    cp_path = _get_checkpoint_dir()
     cp_last = tf.train.latest_checkpoint(cp_path)
     if not cp_last:
         logger.warning(f'No checkpoints found in {cp_path}')
@@ -100,18 +122,23 @@ def load_model(model: tf.keras.Model) -> tf.keras.Model:
 
     return model
 
-def cleanup_checkpoints():
-    """ Remove abundant checkpoints after model fit run with checkpoint-saving callback """
-    try:
-        cp_path = os.path.join(CHECKPOINT_DIR, _checkpoint_subdir())
-        cp_last = tf.train.latest_checkpoint(cp_path)
-        if not cp_last:
-            logger.warning(f'No checkpoints found in {cp_path}')
-        else:
-            cp_name = os.path.split(cp_last)[1]
-            logger.info(f'Latest checkpoint is {cp_name}')
-            files = [fn for fn in os.listdir(cp_path) if fn.startswith('cp-') and not cp_name in fn]
-            for fn in files:
-                os.remove(os.path.join(cp_path, fn))
-    except FileNotFoundError:
-        pass
+def cleanup_checkpoints(keep: int = 3):
+    """ Remove abundant checkpoints after model fit """
+    import re
+    from contextlib import suppress
+    
+    cp_path = _get_checkpoint_dir()
+    cp_last = tf.train.latest_checkpoint(cp_path)
+    if not cp_last:
+        logger.warning(f'No checkpoints found in {cp_path}')
+    else:
+        cp_name = os.path.split(cp_last)[1]
+        logger.info(f'Latest checkpoint is {cp_name}')
+        cp_num = int(re.search('\\d+', cp_name).group(0))
+
+        files = [fn for fn in os.listdir(cp_path) if fn.startswith('cp-') and not cp_name in fn]
+        for fn in files:
+            ncp = int(re.search('\\d+', fn).group(0))
+            if ncp > cp_num or ncp < cp_num - keep:
+                with suppress(FileNotFoundError):
+                    os.remove(os.path.join(cp_path, fn))

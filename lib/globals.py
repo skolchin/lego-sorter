@@ -10,7 +10,7 @@ flags.DEFINE_bool('gray', False, short_name='g',
 flags.DEFINE_bool('edges', False, short_name='e', 
     help='Convert images to wireframe (edges-only) images')
 flags.DEFINE_bool('emboss', False, short_name='x', 
-    help='Highlight edges by combining grayscale and wireframe augmentations')
+    help='Mix wireframe with actual image, can be combined with --gray')
 flags.DEFINE_boolean('zoom', False, short_name='z', 
     help='Apply zoom augmentation (slows down the training by x5)')
 

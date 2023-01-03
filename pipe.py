@@ -18,8 +18,10 @@ from lib.model import load_model, make_model
 from lib.image_dataset import fast_get_class_names, predict_image, predict_image_probs
 
 FLAGS = flags.FLAGS
-flags.DEFINE_boolean('equalize_luminosity', False, 
+flags.DEFINE_boolean('equalize_luminosity', True, 
     help='Apply luminosity equalization filter', short_name='eq')
+flags.DEFINE_float('zoom_level', 2.0, lower_bound=0.0,
+    help='Zoom level', short_name='zl')
 flags.declare_key_flag('gray')
 flags.declare_key_flag('edges')
 flags.declare_key_flag('zoom')
@@ -79,7 +81,7 @@ def main(argv):
             bgmask = back_sub.apply(eq_frame, learningRate=0)
             roi_bbox = bgmask_to_bbox(bgmask)
             if roi_bbox is not None:
-                roi = extract_roi(frame, roi_bbox)
+                roi = extract_roi(frame, roi_bbox, zoom_level=FLAGS.zoom_level)
                 roi_rgb = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
                 labels_probs = predict_image_probs(model, roi_rgb, class_names)
                 logger.debug(f'Top-3 detections: {labels_probs[:3]}')
@@ -100,7 +102,7 @@ def main(argv):
         show_frame(frame)
 
         if frame_count % FPS_RATE == 0 and show_debug:
-            show_hist_window(frame, roi, ref)
+            show_hist_window(frame, roi, ref, log_scale=True)
             show_roi_window(roi, roi_caption)
             show_ref_window(ref, roi_label)
 
