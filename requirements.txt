@@ -1,6 +1,6 @@
 # CUDA 11.2.0_460.89, CUDNN 11.2_8.1.1.33
 tensorflow-gpu==2.10.1
-opencv>=4.0.0
+#opencv==4.6.0
 matplotlib
 seaborn
 tensorflow_addons
