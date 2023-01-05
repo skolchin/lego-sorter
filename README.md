@@ -72,7 +72,7 @@ from images dataset.
 
 ## Inferrence
 
-The `pipe.py` script is a prototype of the project's control panel. When run,
+The `static_pipe.py` script is a prototype of the project's control panel. When run,
 it will connect to a video camera and allow to classify Lego pieces put under
 that camera.
 

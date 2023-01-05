@@ -12,7 +12,7 @@ from typing import Iterable, Tuple
 
 from .globals import IMAGE_DIR
 from .image_dataset import _preprocess
-from .pipe_status import StatusInfo
+from .status_info import StatusInfo
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,5 @@
 # LEGO sorter project
-# Video recognition pipeline
+# Video recognition pipeline demo
 # (c) kol, 2022
 
 import os
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 from lib.globals import OUTPUT_DIR
 from lib.pipe_utils import *
-from lib.pipe_status import StatusInfo
+from lib.status_info import StatusInfo
 from lib.model import load_model, make_model
 from lib.image_dataset import fast_get_class_names, predict_image, predict_image_probs
 
@@ -31,6 +31,7 @@ HELP_INFO = 'Press ESC or Q to quit, S for camera settings, C for video capture'
 
 def main(argv):
     """ Video recognition pipeline """
+    
     logger.setLevel(logging.INFO)
     show_welcome_screen()
     cv2.waitKey(10)
