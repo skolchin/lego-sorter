@@ -11,7 +11,6 @@ from functools import cache
 from typing import Iterable, Tuple
 
 from .globals import IMAGE_DIR
-from .image_dataset import _preprocess
 from .status_info import StatusInfo
 
 logger = logging.getLogger(__name__)
@@ -163,6 +162,8 @@ def plot_hist(img_list: list, wsize: Tuple[int], log_scale: bool = False) -> np.
     return imu.resize(buf, wsize)
 
 def preprocess_image(frame: np.ndarray) -> np.ndarray:
+    from .image_dataset import _preprocess
+    
     if frame is None:
         return None
     frame = _preprocess(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))[0]

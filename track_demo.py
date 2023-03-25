@@ -12,6 +12,8 @@ from lib.controller import Controller
 
 logger = logging.getLogger(__name__)
 
+CAMERA_ID = 0
+
 def init_back_sub(frame):
     back_sub = cv2.createBackgroundSubtractorMOG2(history=100, varThreshold=20.0, detectShadows=True)
     back_sub.apply(frame, learningRate=1)
@@ -22,7 +24,7 @@ def main(_):
     show_welcome_screen()
     cv2.waitKey(10)
 
-    cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    cam = cv2.VideoCapture(CAMERA_ID, cv2.CAP_DSHOW)
     if not cam.isOpened():
         logger.error('Cannot open camera, exiting')
         return
