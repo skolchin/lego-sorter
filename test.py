@@ -26,7 +26,7 @@ def get_file_label(file_name):
     if matched and '_' in short_name:
         return short_name.split('_')[0]
     if matched:
-        return matched.match
+        return matched.group(0)
     return None
 
 def plot_confusion_matrix(actual, predicted, class_names):
@@ -46,7 +46,7 @@ def plot_confusion_matrix(actual, predicted, class_names):
     plt.show()
 
 FLAGS = flags.FLAGS
-flags.DEFINE_multi_string('files', None, 'Predict for image files', short_name='f')
+flags.DEFINE_multi_string('file', None, 'Predict for image file(-s)', short_name='f')
 flags.DEFINE_string('label', None, 'Predict for specific label', short_name='c')
 flags.DEFINE_boolean('confusion', None, 'Plot confusion matrix', short_name='m')
 flags.declare_key_flag('gray')
@@ -68,10 +68,10 @@ def main(argv):
         label_data = filter_dataset_by_label(image_data.tfds, image_data.class_names, FLAGS.label)
         show_prediction_samples(model, label_data, image_data.class_names)
 
-    elif FLAGS.files:
+    elif FLAGS.file:
         # prediction for given file(s)
-        true_labels = [get_file_label(fn) for fn in FLAGS.files]
-        predict_image_files(model, FLAGS.files, image_data.class_names, true_labels)
+        true_labels = [get_file_label(fn) for fn in FLAGS.file]
+        predict_image_files(model, FLAGS.file, image_data.class_names, true_labels)
 
     elif FLAGS.confusion:
         # plot confusion matrix

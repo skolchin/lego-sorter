@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Image loading and pre-processing functions (TF-dataset version)
-# (c) kol, 2022
+# (c) kol, 2022-2023
 
 import os
 import numpy as np
@@ -17,12 +17,17 @@ from lib.globals import IMAGE_DIR, BATCH_SIZE, IMAGE_SIZE
 from lib.model import preprocess_input
 
 FLAGS = flags.FLAGS
-flags.DEFINE_float('zoom_factor', 0.3, help='Maximum zoom level for image augmentation')
-flags.DEFINE_float('brightness_factor', 0.3, help='Maximum brightness level for image augmentation')
+flags.DEFINE_float('zoom_factor', 0.2, help='Maximum zoom level for image augmentation')
+flags.DEFINE_float('brightness_factor', 0.2, help='Maximum brightness level for image augmentation')
 flags.DEFINE_float('rotation_factor', 0.45, help='Maximum rotation in image augmentation')
-flags.DEFINE_integer('edge_emboss', 1, lower_bound=0, help='Edge embossing factor')
+flags.DEFINE_float('edge_emboss', 1.0, lower_bound=0.0, help='Edge embossing factor')
 
 tf.get_logger().setLevel('ERROR')
+
+_adjust_brightness = tf.image.adjust_brightness
+_adjust_contrast  = tf.image.adjust_contrast
+_adjust_contrast  = tf.image.adjust_contrast
+_smart_resize = tf.keras.preprocessing.image.smart_resize
 
 ImageDataset = namedtuple('ImageDataset', ['tfds', 'num_files', 'class_names'])
 """ Dataset with extra info """
@@ -47,7 +52,7 @@ def _wireframe(images):
     mask = tf.where(sobel_images < 127.5, 0.0, 255.0)   # VGG-16 operates on [0...255] range
     if FLAGS.edge_emboss > 0:
         kernel = tf.zeros((3, 3, mask.get_shape()[3]))
-        dilation = (1, FLAGS.edge_emboss, FLAGS.edge_emboss, 1)
+        dilation = (1.0, FLAGS.edge_emboss, FLAGS.edge_emboss, 1.0)
         mask = tf.nn.dilation2d(mask, kernel, (1,1,1,1), 'SAME', 'NHWC', dilation, 'dilation')
 
     if len(shape) == 3: mask = mask[0]
@@ -83,7 +88,7 @@ def _augment_images(image_and_label, seed):
 def _rotate_images(feature, label, seed):
     num_samples = int(tf.shape(feature)[0])
     degrees = tf.random.stateless_uniform(
-        shape=(num_samples,), seed=seed, minval=FLAGS.rotation_factor*100, maxval=FLAGS.rotation_factor*100
+        shape=(num_samples,), seed=seed, minval=FLAGS.rotation_factor*100.0, maxval=FLAGS.rotation_factor*100.0
     )
     degrees = degrees * 0.017453292519943295  # convert the angle in degree to radians
     rotated_images = tfa.image.rotate(feature, degrees, fill_mode='reflect')
@@ -220,7 +225,7 @@ def predict_image_files(
 
         plt.figure(file_name)
         plt.title(f'{true_label or "?"} <- {predicted_label} ({predicted_prob:.2%})')
-        plt.imshow(image.astype('uint8'), cmap=cmap)
+        plt.imshow(image.numpy(), cmap=cmap)
         plt.axis('off')
 
     plt.show()
@@ -266,6 +271,6 @@ def filter_dataset_by_label(tfds: tf.data.Dataset, class_names: Iterable[str], l
     label_index = class_names.index(label)
     return tfds.unbatch().filter(lambda _, label: tf.equal(tf.math.argmax(label), label_index)).batch(BATCH_SIZE)
 
-def fast_get_class_names():
+def fast_get_class_names() -> Iterable[str]:
     """ Faster way of getting image class names """
     return [f for f in os.listdir(IMAGE_DIR) if os.path.isdir(os.path.join(IMAGE_DIR, f))]

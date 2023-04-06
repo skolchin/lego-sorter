@@ -1,19 +1,22 @@
 # LEGO sorter project
 # Pipeline support utils
-# (c) kol, 2022
+# (c) kol, 2022-2023
 
 import os
 import cv2
 import numpy as np
 import img_utils22 as imu
 import logging
+from absl import flags
 from functools import cache
-from typing import Iterable, Tuple
+from typing import Callable, Iterable, Optional, Tuple, Union
 
 from .globals import IMAGE_DIR
 from .status_info import StatusInfo
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('lego-tracker')
+
+FLAGS = flags.FLAGS
 
 FPS_RATE = 30
 FRAME_SIZE = (480, 640)
@@ -92,18 +95,33 @@ def hide_ref_window():
     except:
         pass
 
-def green_rect(frame: np.ndarray, bbox: Tuple[int]):
+def color_rect(frame: np.ndarray, bbox: Tuple[int], color: Tuple[int]):
     x, y = bbox[0], bbox[1]
     cx, cy = bbox[0] + bbox[2], bbox[1] + bbox[3]
-    cv2.rectangle(frame, (x,y), (cx, cy), imu.COLOR_GREEN, 1)
+    cv2.rectangle(frame, (x,y), (cx, cy), color, 1)
 
-def green_named_rect(frame: np.ndarray, bbox: Tuple[int], caption: str) -> np.ndarray:
+def green_rect(frame: np.ndarray, bbox: Tuple[int]):
+    color_rect(frame, bbox, imu.COLOR_GREEN)
+
+def red_rect(frame: np.ndarray, bbox: Tuple[int]):
+    color_rect(frame, bbox, imu.COLOR_RED)
+
+def color_named_rect(frame: np.ndarray, bbox: Tuple[int], caption: str, color: Tuple[int]) -> np.ndarray:
     x, y = bbox[0], bbox[1]
     cx, cy = bbox[0] + bbox[2], bbox[1] + bbox[3]
     tx, ty = x, y - 8
-    frame = cv2.putText(frame, caption, (tx, ty), cv2.FONT_HERSHEY_COMPLEX_SMALL, .6, color=imu.COLOR_GREEN)
-    frame = cv2.rectangle(frame, (x,y), (cx, cy), imu.COLOR_GREEN, 1)
+
+    frame = cv2.rectangle(frame, (x,y), (cx, cy), color, 1)
+    if caption:
+        frame = cv2.putText(frame, caption, (tx, ty), cv2.FONT_HERSHEY_COMPLEX_SMALL, .6, color=color)
+        
     return frame
+
+def green_named_rect(frame: np.ndarray, bbox: Tuple[int], caption: str) -> np.ndarray:
+    color_named_rect(frame, bbox, caption, imu.COLOR_GREEN)
+
+def red_named_rect(frame: np.ndarray, bbox: Tuple[int], caption: str) -> np.ndarray:
+    color_named_rect(frame, bbox, caption, imu.COLOR_RED)
 
 def bgmask_to_bbox_contour(bg_mask: np.ndarray) -> Tuple[Tuple[int], Iterable]:
     kernel = imu.misc.get_kernel(10)
@@ -117,25 +135,36 @@ def bgmask_to_bbox_contour(bg_mask: np.ndarray) -> Tuple[Tuple[int], Iterable]:
     areas = [cv2.contourArea(c) for c in contours]
     contour = contours[np.argmax(areas)]
     bbox = cv2.boundingRect(contour)
-    logger.debug(f'{len(contours)} contours detected, max bbox is {bbox}')
+    # logger.debug(f'{len(contours)} contours detected, max bbox is {bbox}')
 
     return bbox, contour
 
 def bgmask_to_bbox(bg_mask: np.ndarray) -> Tuple[int]:
     return bgmask_to_bbox_contour(bg_mask)[0]
 
-def extract_roi(frame: np.ndarray, bbox: Tuple[int], bbox_relax=0.2, zoom_level=2.0) -> np.ndarray:
-    dw, dh = int(bbox[2]*bbox_relax), int(bbox[3]*bbox_relax)
+def extract_roi(
+    frame: np.ndarray, 
+    bbox: Tuple[int], 
+    bbox_relax: Union[float, Callable[[int, int], Tuple[int, int]], None] = 0.2, 
+    zoom: Optional[float] = 0.0) -> np.ndarray:
+
+    if callable(bbox_relax):
+        dw, dh = bbox_relax(bbox[2], bbox[3])
+    else:
+        dw, dh = int(bbox[2]*bbox_relax), int(bbox[3]*bbox_relax)
+
     bbox = [
         max(bbox[0] - dw, 0),
         max(bbox[1] - dh, 0),
         min(bbox[0] + bbox[2] + dw, frame.shape[1]),
         min(bbox[1] + bbox[3] + dh, frame.shape[0])
     ]
-    logger.debug(f'Normalized bbox: {bbox}')
     roi = imu.get_image_area(frame, bbox)
-    if zoom_level > 0.0:
-        roi = imu.rescale(roi, scale=zoom_level, center=True, pad_color=imu.COLOR_WHITE)
+    if zoom > 0.0:
+        from .image_dataset import _smart_resize, IMAGE_SIZE
+        roi = imu.rescale(roi, scale=zoom, center=True, pad_color=imu.COLOR_WHITE)
+        roi = _smart_resize(roi, IMAGE_SIZE)
+
     return roi
 
 def plot_hist(img_list: list, wsize: Tuple[int], log_scale: bool = False) -> np.ndarray:
@@ -170,11 +199,14 @@ def preprocess_image(frame: np.ndarray) -> np.ndarray:
     if hasattr(frame, 'numpy'): frame = frame.numpy()
     return frame.astype('uint8')
 
-@cache
-def get_ref_image(label: str) -> np.ndarray:
-    fn = os.path.join(IMAGE_DIR, label, f'{label}_0.png')
-    try:
-        return cv2.imread(fn)
-    except FileNotFoundError:
-        logger.error(f'Cannot find file {fn}')
-        return None
+def get_ref_images(class_names) -> Iterable:
+    ref_images = {}
+    for label in class_names:
+        fn = os.path.join(IMAGE_DIR, label, f'{label}_0.png')
+        try:
+            ref_images[label] = cv2.imread(fn)
+        except FileNotFoundError:
+            logger.error(f'Cannot find file {fn}')
+            return None
+    return ref_images
+

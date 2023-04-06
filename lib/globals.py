@@ -30,5 +30,5 @@ OUTPUT_DIR = os.path.join(ROOT_DIR, 'out')
 BATCH_SIZE = 32
 """ Batch size """
 
-IMAGE_SIZE = (256, 256)
+IMAGE_SIZE = (224, 224)
 """ Size of images in processing pipeline """

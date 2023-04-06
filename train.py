@@ -57,12 +57,12 @@ def main(argv):
     model = make_model(num_labels)
     print('\nModel summary:\n---')
     model.summary()
+    load_model(model)
 
     if not FLAGS.save:
         callbacks_list = [get_early_stopping_callback()]
     else:
         callbacks_list = [get_early_stopping_callback(), get_checkpoint_callback()]
-        load_model(model)
 
     history = model.fit(
         aug_data, 

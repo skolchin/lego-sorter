@@ -3,4 +3,6 @@ __pycache__/
 images/
 images.0/
 checkpoints/
+checkpoints.0/
 /venv
+video/
