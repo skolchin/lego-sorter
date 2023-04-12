@@ -16,8 +16,7 @@ from lib.model import load_model, make_model
 from lib.image_dataset import fast_get_class_names, predict_image
 
 logging.basicConfig(format='%(levelname)s: %(message)s')
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger('lego-tracker')
 
 def is_debug() -> bool:
     return logger.getEffectiveLevel() == logging.DEBUG

@@ -161,10 +161,8 @@ def extract_roi(
     ]
     roi = imu.get_image_area(frame, bbox)
     if zoom > 0.0:
-        from .image_dataset import _smart_resize, IMAGE_SIZE
-        roi = imu.rescale(roi, scale=zoom, center=True, pad_color=imu.COLOR_WHITE)
-        roi = _smart_resize(roi, IMAGE_SIZE)
-
+        from .image_dataset import zoom_image
+        roi = zoom_image(roi, zoom)
     return roi
 
 def plot_hist(img_list: list, wsize: Tuple[int], log_scale: bool = False) -> np.ndarray:
@@ -202,11 +200,14 @@ def preprocess_image(frame: np.ndarray) -> np.ndarray:
 def get_ref_images(class_names) -> Iterable:
     ref_images = {}
     for label in class_names:
-        fn = os.path.join(IMAGE_DIR, label, f'{label}_0.png')
+        fn = os.path.join(IMAGE_DIR, f'{label}.png')
         try:
-            ref_images[label] = cv2.imread(fn)
+            img = cv2.imread(fn)
+            if img is not None:
+                ref_images[label] = img
+            else:
+                logger.error(f'Cannot find file {fn}')
         except FileNotFoundError:
             logger.error(f'Cannot find file {fn}')
-            return None
     return ref_images
 

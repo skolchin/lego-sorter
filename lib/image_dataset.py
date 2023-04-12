@@ -11,21 +11,21 @@ from absl import flags
 from keras.utils import image_dataset_from_directory
 from collections import namedtuple
 from functools import partial
+from itertools import zip_longest
 from typing import Tuple, Iterable
 
 from lib.globals import IMAGE_DIR, BATCH_SIZE, IMAGE_SIZE
 from lib.model import preprocess_input
 
 FLAGS = flags.FLAGS
-flags.DEFINE_float('zoom_factor', 0.2, help='Maximum zoom level for image augmentation')
-flags.DEFINE_float('brightness_factor', 0.2, help='Maximum brightness level for image augmentation')
+flags.DEFINE_float('zoom_factor', 0.3, help='Maximum zoom level for image augmentation')
+flags.DEFINE_float('brightness_factor', 0.3, help='Maximum brightness level for image augmentation')
 flags.DEFINE_float('rotation_factor', 0.45, help='Maximum rotation in image augmentation')
-flags.DEFINE_float('edge_emboss', 1.0, lower_bound=0.0, help='Edge embossing factor')
+flags.DEFINE_float('edge_emboss', 0.0, lower_bound=0.0, help='Edge embossing factor')
 
 tf.get_logger().setLevel('ERROR')
 
 _adjust_brightness = tf.image.adjust_brightness
-_adjust_contrast  = tf.image.adjust_contrast
 _adjust_contrast  = tf.image.adjust_contrast
 _smart_resize = tf.keras.preprocessing.image.smart_resize
 
@@ -173,7 +173,8 @@ def show_samples(tfds: tf.data.Dataset, class_names: Iterable[str], num_samples:
 def predict_image(
     model: tf.keras.Model, 
     image: np.ndarray, 
-    class_names: Iterable[str]) -> Tuple[str, float]:
+    class_names: Iterable[str],
+    return_image: bool = False) -> Tuple[str, float]:
     """ Run a pretrained model prediction on an image """
 
     resized_image = tf.keras.preprocessing.image.smart_resize(image, IMAGE_SIZE)
@@ -184,7 +185,10 @@ def predict_image(
     label = class_names[most_likely]
     prob = prediction[0][most_likely]
 
-    return label, prob
+    if not return_image:
+        return label, prob
+    
+    return label, prob, prepared_image[0]
 
 def predict_image_probs(
     model: tf.keras.Model, 
@@ -219,7 +223,7 @@ def predict_image_files(
     """ Run a pretrained model prediction on multiple image files and display the result """
 
     cmap = 'gray' if FLAGS.gray or FLAGS.edges else None
-    for file_name, true_label in zip(file_names, true_labels):
+    for file_name, true_label in zip_longest(file_names, true_labels or []):
         image = tf.image.decode_image(tf.io.read_file(file_name))
         predicted_label, predicted_prob = predict_image(model, image, class_names)
 
@@ -227,6 +231,90 @@ def predict_image_files(
         plt.title(f'{true_label or "?"} <- {predicted_label} ({predicted_prob:.2%})')
         plt.imshow(image.numpy(), cmap=cmap)
         plt.axis('off')
+
+    plt.show()
+
+def _pad_to_bounding_box_white(image, offset_height, offset_width,
+                                 target_height, target_width):
+  from tensorflow.python.framework import ops
+  from tensorflow.python.ops import array_ops
+  from tensorflow.python.ops.image_ops_impl import _ImageDimensions, _is_tensor
+
+  with ops.name_scope(None, 'pad_to_bounding_box_white', [image]):
+    image = ops.convert_to_tensor(image, name='image')
+
+    is_batch = True
+    image_shape = image.get_shape()
+    if image_shape.ndims == 3:
+      is_batch = False
+      image = array_ops.expand_dims(image, 0)
+    elif image_shape.ndims is None:
+      is_batch = False
+      image = array_ops.expand_dims(image, 0)
+      image.set_shape([None] * 4)
+    elif image_shape.ndims != 4:
+      raise ValueError(
+          '\'image\' (shape %s) must have either 3 or 4 dimensions.' %
+          image_shape)
+
+    batch, height, width, depth = _ImageDimensions(image, rank=4)
+
+    after_padding_width = target_width - offset_width - width
+
+    after_padding_height = target_height - offset_height - height
+
+    # Do not pad on the depth dimensions.
+    paddings = array_ops.reshape(
+        array_ops.stack([
+            0, 0, offset_height, after_padding_height, offset_width,
+            after_padding_width, 0, 0
+        ]), [4, 2])
+    padded = array_ops.pad(image, paddings, constant_values=255)
+
+    padded_shape = [
+        None if _is_tensor(i) else i
+        for i in [batch, target_height, target_width, depth]
+    ]
+    padded.set_shape(padded_shape)
+
+    if not is_batch:
+      padded = array_ops.squeeze(padded, axis=[0])
+
+    return padded
+
+def zoom_image(image, zoom):
+    is_tensor = isinstance(image, tf.Tensor)
+    shape = np.array(image).shape if not is_tensor else image.get_shape().as_list()
+    image_size = np.array(shape[:2])
+    zoom_size = (image_size * zoom).astype('int')
+    offset_height, offset_width = max((zoom_size[0]-image_size[0]) // 2,0), max((zoom_size[1]-image_size[1]) // 2,0)
+    target_height, target_width = zoom_size[0], zoom_size[1]
+    resized_image = _pad_to_bounding_box_white(image, offset_height, offset_width, target_height, target_width)
+    return resized_image.numpy() if not is_tensor else resized_image
+
+def predict_image_files_zoom(
+    model: tf.keras.Model, 
+    file_names: Iterable[str], 
+    class_names: Iterable[str], 
+    true_labels: Iterable[str] = None,
+    zoom_levels: Iterable[float] = None,
+    show_processed_image: bool = False):
+    """ Run a pretrained model prediction on multiple image files and display the result """
+
+    cmap = 'gray' if FLAGS.gray or FLAGS.edges else None
+    for file_name, true_label in zip_longest(file_names, true_labels or []):
+        image = tf.image.decode_image(tf.io.read_file(file_name), channels=3)
+
+        for zoom in zoom_levels or [1.0]:
+            zoomed_image = zoom_image(image, zoom)
+            zoomed_image = tf.cast(zoomed_image, tf.uint8)
+
+            predicted_label, predicted_prob, processed_image = predict_image(model, zoomed_image, class_names, return_image=True)
+
+            plt.figure(f'{file_name} @ {zoom}')
+            plt.title(f'{true_label or "?"} <- {predicted_label} ({predicted_prob:.2%}) @ {zoom}')
+            plt.imshow(processed_image.numpy() if show_processed_image else zoomed_image.numpy(), cmap=cmap)
+            plt.axis('off')
 
     plt.show()
 
@@ -274,3 +362,12 @@ def filter_dataset_by_label(tfds: tf.data.Dataset, class_names: Iterable[str], l
 def fast_get_class_names() -> Iterable[str]:
     """ Faster way of getting image class names """
     return [f for f in os.listdir(IMAGE_DIR) if os.path.isdir(os.path.join(IMAGE_DIR, f))]
+
+def _crop_and_resize(img, bbox, size):
+    return tf.image.crop_and_resize(
+        image=tf.expand_dims(img,axis=0), 
+        boxes=tf.expand_dims(bbox,axis=0),
+        box_indices=tf.range(1),
+        crop_size=list(size),
+        method='bilinear'
+    ).numpy()[0]

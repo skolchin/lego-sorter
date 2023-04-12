@@ -17,7 +17,9 @@ from lib.image_dataset import (
     show_prediction_samples,
     filter_dataset_by_label, 
     predict_image_files,
-    predict_dataset
+    predict_image_files_zoom,
+    predict_dataset,
+   
 )
 
 def get_file_label(file_name):
@@ -71,7 +73,10 @@ def main(argv):
     elif FLAGS.file:
         # prediction for given file(s)
         true_labels = [get_file_label(fn) for fn in FLAGS.file]
-        predict_image_files(model, FLAGS.file, image_data.class_names, true_labels)
+        # predict_image_files(model, FLAGS.file, image_data.class_names, true_labels)
+        zoom_levels = [x/100.0 for x in range(100, 350, 25)]
+        predict_image_files_zoom(model, FLAGS.file, image_data.class_names, true_labels, zoom_levels, 
+            show_processed_image=True)
 
     elif FLAGS.confusion:
         # plot confusion matrix

@@ -32,7 +32,7 @@ def main(_):
         cam.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_SIZE[0])
 
     frame_count = 0
-    for (frame, bbox, state) in track(cam):
+    for (frame, bbox, state) in track(cam, replace_bg_color=(255,255,255)):
         if bbox is not None:
             green_rect(frame, bbox)
 
