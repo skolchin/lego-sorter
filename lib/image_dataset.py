@@ -1,5 +1,5 @@
 # LEGO sorter project
-# Image loading and pre-processing functions (TF-dataset version)
+# Image loading and processing functions
 # (c) kol, 2022-2023
 
 import os
@@ -24,10 +24,6 @@ flags.DEFINE_float('rotation_factor', 0.45, help='Maximum rotation in image augm
 flags.DEFINE_float('edge_emboss', 0.0, lower_bound=0.0, help='Edge embossing factor')
 
 tf.get_logger().setLevel('ERROR')
-
-_adjust_brightness = tf.image.adjust_brightness
-_adjust_contrast  = tf.image.adjust_contrast
-_smart_resize = tf.keras.preprocessing.image.smart_resize
 
 ImageDataset = namedtuple('ImageDataset', ['tfds', 'num_files', 'class_names'])
 """ Dataset with extra info """
@@ -194,7 +190,7 @@ def predict_image_probs(
     model: tf.keras.Model, 
     image: np.ndarray, 
     class_names: Iterable[str]) -> Iterable[Tuple[str, float]]:
-    """ Run a pretrained model prediction on an image """
+    """ Run a pretrained model prediction on an image returning all detections and probabilities """
 
     resized_image = tf.keras.preprocessing.image.smart_resize(image, IMAGE_SIZE)
     prepared_image, _ = _preprocess(tf.expand_dims(resized_image, 0))
@@ -206,36 +202,21 @@ def predict_image_probs(
         probs.append((label, prob))
     return probs
 
-def predict_image_file(
-    model: tf.keras.Model, 
-    file_name: str, 
-    class_names: Iterable[str], 
-    true_label: str = None):
-    """ Run a pretrained model prediction on an image file and display the result """
+def predict_dataset(model: tf.keras.Model, tfds: tf.data.Dataset) -> Tuple[tf.Tensor, tf.Tensor]:
+    """ Get predictions for TF dataset """
 
-    predict_image_files(model, [file_name], class_names, [true_label])
+    true_labels = [tf.argmax(labels) for _, labels in tfds.unbatch()]
+    true_labels = tf.stack(true_labels, axis=0)
 
-def predict_image_files(
-    model: tf.keras.Model, 
-    file_names: Iterable[str], 
-    class_names: Iterable[str], 
-    true_labels: Iterable[str] = None):
-    """ Run a pretrained model prediction on multiple image files and display the result """
+    predicted_labels = model.predict(tfds)
+    predicted_labels = tf.concat(predicted_labels, axis=0)
+    predicted_labels = tf.argmax(predicted_labels, axis=1)
 
-    cmap = 'gray' if FLAGS.gray or FLAGS.edges else None
-    for file_name, true_label in zip_longest(file_names, true_labels or []):
-        image = tf.image.decode_image(tf.io.read_file(file_name))
-        predicted_label, predicted_prob = predict_image(model, image, class_names)
+    return true_labels, predicted_labels
 
-        plt.figure(file_name)
-        plt.title(f'{true_label or "?"} <- {predicted_label} ({predicted_prob:.2%})')
-        plt.imshow(image.numpy(), cmap=cmap)
-        plt.axis('off')
-
-    plt.show()
-
-def _pad_to_bounding_box_white(image, offset_height, offset_width,
-                                 target_height, target_width):
+def _pad_to_bounding_box_color(image, offset_height, offset_width,
+                                 target_height, target_width, pad_color):
+  """ Internal - TF `pad_to_bounding_box()` function adjusted to accept padding color """
   from tensorflow.python.framework import ops
   from tensorflow.python.ops import array_ops
   from tensorflow.python.ops.image_ops_impl import _ImageDimensions, _is_tensor
@@ -258,9 +239,7 @@ def _pad_to_bounding_box_white(image, offset_height, offset_width,
           image_shape)
 
     batch, height, width, depth = _ImageDimensions(image, rank=4)
-
     after_padding_width = target_width - offset_width - width
-
     after_padding_height = target_height - offset_height - height
 
     # Do not pad on the depth dimensions.
@@ -269,7 +248,7 @@ def _pad_to_bounding_box_white(image, offset_height, offset_width,
             0, 0, offset_height, after_padding_height, offset_width,
             after_padding_width, 0, 0
         ]), [4, 2])
-    padded = array_ops.pad(image, paddings, constant_values=255)
+    padded = array_ops.pad(image, paddings, constant_values=pad_color)
 
     padded_shape = [
         None if _is_tensor(i) else i
@@ -282,14 +261,25 @@ def _pad_to_bounding_box_white(image, offset_height, offset_width,
 
     return padded
 
-def zoom_image(image, zoom):
+def zoom_image(image, zoom: float, pad_color: int = 0):
+    """ Image zoom implementation with tensorflow functions.
+
+    Currently only zooms image out and its countered to normal meaning: 
+    `zoom > 1.0` means object is zoomed _out_ (become smaller) at given proportion.
+
+    Will work this out later.
+    """
+    if zoom == 1.0:
+        return image
+
     is_tensor = isinstance(image, tf.Tensor)
     shape = np.array(image).shape if not is_tensor else image.get_shape().as_list()
     image_size = np.array(shape[:2])
     zoom_size = (image_size * zoom).astype('int')
     offset_height, offset_width = max((zoom_size[0]-image_size[0]) // 2,0), max((zoom_size[1]-image_size[1]) // 2,0)
     target_height, target_width = zoom_size[0], zoom_size[1]
-    resized_image = _pad_to_bounding_box_white(image, offset_height, offset_width, target_height, target_width)
+    resized_image = _pad_to_bounding_box_color(image, offset_height, offset_width, target_height, target_width, pad_color)
+
     return resized_image.numpy() if not is_tensor else resized_image
 
 def predict_image_files_zoom(
@@ -299,14 +289,14 @@ def predict_image_files_zoom(
     true_labels: Iterable[str] = None,
     zoom_levels: Iterable[float] = None,
     show_processed_image: bool = False):
-    """ Run a pretrained model prediction on multiple image files and display the result """
+    """ Run a pretrained model prediction on multiple image files with optional zooming and display the result """
 
     cmap = 'gray' if FLAGS.gray or FLAGS.edges else None
     for file_name, true_label in zip_longest(file_names, true_labels or []):
         image = tf.image.decode_image(tf.io.read_file(file_name), channels=3)
 
         for zoom in zoom_levels or [1.0]:
-            zoomed_image = zoom_image(image, zoom)
+            zoomed_image = zoom_image(image, zoom, 255)
             zoomed_image = tf.cast(zoomed_image, tf.uint8)
 
             predicted_label, predicted_prob, processed_image = predict_image(model, zoomed_image, class_names, return_image=True)
@@ -318,17 +308,25 @@ def predict_image_files_zoom(
 
     plt.show()
 
-def predict_dataset(model: tf.keras.Model, tfds: tf.data.Dataset) -> Tuple[tf.Tensor, tf.Tensor]:
-    """ Get predictions for TF dataset """
+def predict_image_file(
+    model: tf.keras.Model, 
+    file_name: str, 
+    class_names: Iterable[str], 
+    true_label: str = None,
+    show_processed_image: bool = False):
+    """ Run a pretrained model prediction on an image file and display the result """
 
-    true_labels = [tf.argmax(labels) for _, labels in tfds.unbatch()]
-    true_labels = tf.stack(true_labels, axis=0)
+    predict_image_files_zoom(model, [file_name], class_names, [true_label], show_processed_image=show_processed_image)
 
-    predicted_labels = model.predict(tfds)
-    predicted_labels = tf.concat(predicted_labels, axis=0)
-    predicted_labels = tf.argmax(predicted_labels, axis=1)
+def predict_image_files(
+    model: tf.keras.Model, 
+    file_names: Iterable[str], 
+    class_names: Iterable[str], 
+    true_labels: Iterable[str] = None,
+    show_processed_image: bool = False):
+    """ Run a pretrained model prediction on multiple image files and display the result """
 
-    return true_labels, predicted_labels
+    predict_image_files_zoom(model, file_names, class_names, true_labels, show_processed_image=show_processed_image)
 
 def show_prediction_samples(
     model: tf.keras.Model, 
@@ -363,11 +361,3 @@ def fast_get_class_names() -> Iterable[str]:
     """ Faster way of getting image class names """
     return [f for f in os.listdir(IMAGE_DIR) if os.path.isdir(os.path.join(IMAGE_DIR, f))]
 
-def _crop_and_resize(img, bbox, size):
-    return tf.image.crop_and_resize(
-        image=tf.expand_dims(img,axis=0), 
-        boxes=tf.expand_dims(bbox,axis=0),
-        box_indices=tf.range(1),
-        crop_size=list(size),
-        method='bilinear'
-    ).numpy()[0]

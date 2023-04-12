@@ -11,13 +11,14 @@ from enum import IntEnum
 from time import time
 from typing import List, Callable, Tuple
 
+from lib.globals import OUTPUT_DIR
 from .pipe_utils import bgmask_to_bbox, extract_roi
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer('var_threshold', 40, help='Background detection threshold')
+flags.DEFINE_integer('var_threshold', 60, help='Background detection threshold')
 flags.DEFINE_float('min_confidence', 0.1, help='Minimum confidence level to process the detection')
 flags.DEFINE_float('valid_confidence', 0.3, help='Confidence level to consider detection valid')
-flags.DEFINE_boolean('save_roi', False, help='Save ROIs detected to out/roi directory')
+flags.DEFINE_boolean('save_roi', False, help='Save detected ROI images to to out/roi directory')
 
 logger = logging.getLogger('lego-tracker')
 
@@ -52,8 +53,7 @@ def track(cam: cv2.VideoCapture, replace_bg_color: Tuple[int] = None):
     
     Arguments:
         cam:    frame source (camera or video)
-        replace_bg_color: if not `None`, background of stopped object will be erased and replaced with given color.
-            Initially detected and moved objects will remain intact to avoid performace impact.
+        replace_bg_color: if not `None`, background of an object detected will be erased and replaced with given color
 
     Yields:
         `(frame, obj_bbox, obj_state)` tuple containing:
@@ -133,14 +133,14 @@ def track_detect(
     it uses a callback to classify the object on that ROI. After that, the detection loop is stopped until new object appears.
 
     The function yields every frame along with classification results. Only one object at a time could be tracked.
-    
+
     Arguments:
         cam:    frame source (camera or video)
         detect_callback:    A callback which must accept a ROI of object detected and return
             a list contaiting `(label, probability)` tuples sorted descending on probability.
             Only 1st element of that iterable is used.
         track_time:     time limit to perform initial frame collection (in seconds)
-        min_prob:   probability threshold
+        replace_bg_color: if not `None`, background of an object detected will be erased and replaced with given color
 
     Yields:
         `(frame, obj_bbox, detection)` tuple containing:
@@ -169,12 +169,14 @@ def track_detect(
                 yield frame, bbox, None
 
             case ObjectState.STOP:
-                # Object has stopped under the cam
+                # Object has stopped
                 if not detect_start_time:
                     detect_start_time = time()
                     logger.debug('Detection loop started')
 
                 if time() <= detect_start_time + track_time:
+                    # Time didn't elapse, collect predictions
+                    # No detections are emitted while detection loop is running
                     roi = extract_roi(frame, bbox, zoom=FLAGS.zoom_factor)
                     roi_rgb = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
                     labels_probs = detect_callback(roi_rgb)
@@ -183,9 +185,10 @@ def track_detect(
                     if roi_prob > FLAGS.min_confidence:
                         detections.append((roi, roi_label, roi_prob, bbox))
                         if FLAGS.save_roi:
-                            cv2.imwrite(os.path.join('out', 'roi', f'{roi_label}_{frame_count:04d}.png'), roi)
+                            cv2.imwrite(os.path.join(OUTPUT_DIR, 'roi', f'{roi_label}_{frame_count:04d}.png'), roi)
 
                 elif detections:
+                    # Time elapsed, find best prediction which is going to be emitted to the caller
                     probs = np.array([d[2] for d in detections])
                     idx = np.argmax(probs)
                     detection, detection_bbox = detections[idx][:-1], detections[idx][-1]

@@ -8,8 +8,7 @@ import numpy as np
 import img_utils22 as imu
 import logging
 from absl import flags
-from functools import cache
-from typing import Callable, Iterable, Optional, Tuple, Union
+from typing import Iterable, Tuple
 
 from .globals import IMAGE_DIR
 from .status_info import StatusInfo
@@ -135,7 +134,6 @@ def bgmask_to_bbox_contour(bg_mask: np.ndarray) -> Tuple[Tuple[int], Iterable]:
     areas = [cv2.contourArea(c) for c in contours]
     contour = contours[np.argmax(areas)]
     bbox = cv2.boundingRect(contour)
-    # logger.debug(f'{len(contours)} contours detected, max bbox is {bbox}')
 
     return bbox, contour
 
@@ -145,14 +143,10 @@ def bgmask_to_bbox(bg_mask: np.ndarray) -> Tuple[int]:
 def extract_roi(
     frame: np.ndarray, 
     bbox: Tuple[int], 
-    bbox_relax: Union[float, Callable[[int, int], Tuple[int, int]], None] = 0.2, 
-    zoom: Optional[float] = 0.0) -> np.ndarray:
+    bbox_relax: float = 0.2, 
+    zoom: float = 0.0) -> np.ndarray:
 
-    if callable(bbox_relax):
-        dw, dh = bbox_relax(bbox[2], bbox[3])
-    else:
-        dw, dh = int(bbox[2]*bbox_relax), int(bbox[3]*bbox_relax)
-
+    dw, dh = int(bbox[2]*bbox_relax), int(bbox[3]*bbox_relax)
     bbox = [
         max(bbox[0] - dw, 0),
         max(bbox[1] - dh, 0),
@@ -160,9 +154,9 @@ def extract_roi(
         min(bbox[1] + bbox[3] + dh, frame.shape[0])
     ]
     roi = imu.get_image_area(frame, bbox)
-    if zoom > 0.0:
+    if zoom is not None and zoom > 0.0:
         from .image_dataset import zoom_image
-        roi = zoom_image(roi, zoom)
+        roi = zoom_image(roi, zoom, 255)
     return roi
 
 def plot_hist(img_list: list, wsize: Tuple[int], log_scale: bool = False) -> np.ndarray:

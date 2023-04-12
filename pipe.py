@@ -23,12 +23,12 @@ flags.declare_key_flag('gray')
 flags.declare_key_flag('edges')
 flags.declare_key_flag('zoom')
 flags.declare_key_flag('zoom_factor')
-flags.declare_key_flag('brightness_factor')
+# here zoom is a model parameter, and zoom_factor is actual zoom
 
 flags.DEFINE_integer('camera', 0, short_name='c', help='Camera ID')
 flags.DEFINE_string('file', None, short_name='f', help='Process video from given file')
 flags.DEFINE_boolean('debug', False, help='Start with debug info displayed')
-flags.DEFINE_boolean('video', False, help='Start with video capture')
+flags.DEFINE_boolean('save_video', False, help='Start with video capture')
 
 HELP_INFO = 'Press ESC or Q to quit, S for camera settings, C for video capture'
 
@@ -81,11 +81,10 @@ def main(_):
         logger.info('Starting video output to %s', fn)
         video_out = cv2.VideoWriter(fn, cv2.VideoWriter_fourcc(*'mp4v'), 30.0, tuple(reversed(FRAME_SIZE)))
 
-    for (frame, roi_bbox, detection) in track_detect(
-        cam, 
-        lambda roi: predict_image_probs(model, roi, class_names), 
-        track_time=2.0,
-        replace_bg_color=(255,255,255)):
+    for (frame, roi_bbox, detection) in track_detect(cam, 
+                            lambda roi: predict_image_probs(model, roi, class_names), 
+                            track_time=2.0,
+                            replace_bg_color=(255,255,255)):
 
         if detection is not None:
             roi, new_roi_label, roi_prob = detection
