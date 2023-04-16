@@ -14,10 +14,13 @@ logger = logging.getLogger(__name__)
 
 CAMERA_ID = 0
 
+
 def init_back_sub(frame):
-    back_sub = cv2.createBackgroundSubtractorMOG2(history=100, varThreshold=20.0, detectShadows=True)
+    back_sub = cv2.createBackgroundSubtractorMOG2(
+        history=100, varThreshold=20.0, detectShadows=True)
     back_sub.apply(frame, learningRate=1)
     return back_sub
+
 
 def main(_):
     logger.setLevel(logging.INFO)
@@ -30,8 +33,8 @@ def main(_):
         return
 
     cam.set(cv2.CAP_PROP_FPS, FPS_RATE)
-    cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('m','j','p','g'))
-    cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('M','J','P','G'))
+    cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('m', 'j', 'p', 'g'))
+    cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('M', 'J', 'P', 'G'))
     cam.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_SIZE[1])
     cam.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_SIZE[0])
 
@@ -59,7 +62,7 @@ def main(_):
                     # Object is gone
                     logger.info('Object has left the building')
                     obj_tracker = None
-                    controller.start()
+                    controller.connect()
 
             elif obj_bbox[2] == FRAME_SIZE[1] and obj_bbox[3] == FRAME_SIZE[0]:
                 logger.error('Object is too big, resetting the pipe')
@@ -107,10 +110,11 @@ def main(_):
                 obj_bbox = None
                 obj_tracker = None
                 logger.info('Background captured')
-                controller.start()
+                controller.connect()
 
             case 115:   # s
                 cam.set(cv2.CAP_PROP_SETTINGS, 1)
+
 
 if __name__ == '__main__':
     app.run(main)
