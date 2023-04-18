@@ -22,9 +22,9 @@ FLAGS = flags.FLAGS
 flags.declare_key_flag('gray')
 flags.declare_key_flag('edges')
 flags.declare_key_flag('zoom')
-flags.declare_key_flag('zoom_factor')
-# here zoom is a model parameter, and zoom_factor is actual zoom
 
+del FLAGS.zoom_factor
+flags.DEFINE_float('zoom_factor', 2.0, help='ROI zoom factor')
 flags.DEFINE_integer('camera', 0, short_name='c', help='Camera ID')
 flags.DEFINE_string('file', None, short_name='f', help='Process video from given file')
 flags.DEFINE_boolean('debug', False, help='Start with debug info displayed')
@@ -76,9 +76,9 @@ def main(_):
     if not FLAGS.file:
         status_info.append(HELP_INFO)
 
-    if FLAGS.video:
+    if FLAGS.save_video:
         fn = os.path.join(OUTPUT_DIR, f'pipe_{datetime.now().strftime("%y%m%d_%H%M%S")}.mp4')
-        logger.info('Starting video output to %s', fn)
+        status_info.append('Starting video output to %s', fn)
         video_out = cv2.VideoWriter(fn, cv2.VideoWriter_fourcc(*'mp4v'), 30.0, tuple(reversed(FRAME_SIZE)))
 
     for (frame, roi_bbox, detection) in track_detect(cam, 
@@ -86,22 +86,23 @@ def main(_):
                             track_time=2.0,
                             replace_bg_color=(255,255,255)):
 
-        if detection is not None:
-            roi, new_roi_label, roi_prob = detection
-            if new_roi_label == roi_label:
-                roi_caption = None
-            else:
-                roi_label = new_roi_label
-                roi_caption = f'{roi_label} ({roi_prob:.2%})'
-                status_info.append(f'Detection: {roi_caption}', True)
-                logger.info(f'New detection: {roi_caption}')
+        if detection is None:
+            roi = None
+            roi_caption = None
+            roi_label = None
+        else:
+            roi = detection.roi
+            if detection.label != roi_label:
+                roi_label = detection.label
+                roi_caption = f'{detection.label} ({detection.prob:.2%})'
+                status_info.append(f'Detection: {roi_caption}')
 
         if show_preprocessed:
             frame = preprocess_image(frame)
         else:
             status_info.apply(frame)
             if roi_bbox is not None:
-                red_named_rect(frame, roi_bbox, roi_caption)
+                green_rect(frame, roi_bbox)
 
         show_frame(frame)
 
@@ -127,20 +128,22 @@ def main(_):
                 break
 
             case 32:    # space
-                status_info.assign_and_apply(frame, 'Paused, press SPACE to resume', True)
+                status_info.append('Paused, press SPACE to resume', True)
+                status_info.apply(frame)
                 show_frame(frame)
                 while int(cv2.waitKey(10) & 0xFF) not in (27, 32, 113):
                     pass
+                status_info.append('Resumed')
 
             case 99:    # c
                 if video_out is None:
                     fn = os.path.join(OUTPUT_DIR, f'pipe_{datetime.now().strftime("%y%m%d_%H%M%S")}.mp4')
-                    logger.info('Starting video output to %s', fn)
+                    status_info.append('Starting video output to %s', fn)
                     video_out = cv2.VideoWriter(fn, cv2.VideoWriter_fourcc(*'mp4v'), 30.0, tuple(reversed(FRAME_SIZE)))
                 else:
                     video_out.release()
                     video_out = None
-                    logger.info('Video output stopped')
+                    status_info.append('Video output stopped')
 
             case 100:    # d
                 if show_debug: 

@@ -145,6 +145,8 @@ def extract_roi(
     bbox: Tuple[int], 
     bbox_relax: float = 0.2, 
     zoom: float = 0.0) -> np.ndarray:
+    """ Extracts an ROI (region of interest) with specified bounding box optionally zooming it out by given factor
+    """
 
     dw, dh = int(bbox[2]*bbox_relax), int(bbox[3]*bbox_relax)
     bbox = [

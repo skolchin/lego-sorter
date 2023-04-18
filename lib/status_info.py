@@ -5,7 +5,10 @@
 import cv2
 import numpy as np
 import img_utils22 as imu
+import logging
 from typing import Iterable
+
+_logger = logging.getLogger('lego-tracker')
 
 class StatusInfo:
     def __init__(self, title: str = 'status', size: tuple = (240, 320), max_len: int = 0, max_width: int = 70):
@@ -42,6 +45,7 @@ class StatusInfo:
 
     def insert(self, at: int, status: str, important: bool = False):
         self.__status.insert(at, (status, important))
+        _logger.info(status)
         if self.max_len:
             while len(self.__status) > self.max_len:
                 del self.__status[-1]
@@ -50,6 +54,7 @@ class StatusInfo:
 
     def append(self, status: str, important: bool = False):
         self.__status.append((status, important))
+        _logger.info(status)
         if self.max_len:
             while len(self.__status) > self.max_len:
                 del self.__status[0]
