@@ -19,6 +19,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 controller = Controller()
+camera = Camera()
 
 ui_connected = False
 
@@ -53,7 +54,7 @@ def camera_list():
 
 @app.route('/video_feed')
 def video_feed():
-    return Response(controller.camera.get_video_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(camera.get_video_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 @app.route('/')
@@ -63,24 +64,23 @@ def index():
 
 
 # websocket
-def status_sender():
-    while True:
-        status = {'connected': session['connected']}
-        logger.info(status)
-        emit('status', status)
+def message_listener():
+    while session['connected'] == 1:
+        message = controller.get_next_message()
+        if message is not None and 'mtype' in message.keys():
+            mtype = message['mtype']
+
+            match mtype:
+                case "S":
+                    emit('status', message)
+                case "C":
+                    emit('confirmation', {'message': message})
+                case "E":
+                    emit('error', {'message': message})
+                case _:
+                    logger.error(f"Incorrect message type {mtype}")
+
         eventlet.sleep(1)
-
-
-def status_callback(data):
-    emit('status', {'data': data, 'connected': session['connected']})
-
-
-def confirmation_callback(message):
-    emit('confirmation', {'message': message})
-
-
-def error_fallback(message):
-    emit('error', {'message': message})
 
 
 @socketio.on('connect', namespace="/sorter")
@@ -91,18 +91,15 @@ def sorter_connect(auth):
 @socketio.on('connect_hw', namespace='/sorter')
 def sorter_start(message):
     session['connected'] = 1
-    controller.connect(status_callback, confirmation_callback, error_fallback)
+    controller.connect()
 
-    logger.info("Sorter started")
-
-
-@socketio.on('activate_camera', namespace='/sorter')
-def sorter_start(message):
-    controller.activate_camera()
+    logger.info("Sorter connected")
+    message_listener()
 
 
 @socketio.on('run', namespace='/sorter')
 def sorter_run(message):
+    camera.capture_background()
     controller.run()
 
 
@@ -114,13 +111,22 @@ def sorter_wait(message):
 @socketio.on('disconnect_hw', namespace='/sorter')
 def sorter_stop(message):
     session['connected'] = 0
-    controller.stop()
+    camera.stop()
+    controller.disconnect()
 
     logger.info("Sorter stopped")
 
 
 @socketio.on('disconnect', namespace="/sorter")
 def sorter_disconnect():
+    camera.stop()
+    controller.disconnect()
+    socketio.stop()
+
+    pool = eventlet.GreenPool()
+    for p in pool:
+        eventlet.kill(p)
+
     logger.info("User interface disconnected")
 
 

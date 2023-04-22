@@ -5,12 +5,12 @@
 import os
 import json
 import logging
-import eventlet
+from queue import Queue
+from threading import Event, Lock, Thread
 import serial
 import serial.tools.list_ports
 import time
 from typing import Tuple, Iterable
-from lib.camera import Camera
 from lib.exceptions import NoSorter, NotConnectedToSorter, NotImplemented
 
 from .globals import ROOT_DIR
@@ -29,12 +29,14 @@ class Controller:
         return cls.instance
 
     UNKNOWN: str = '_'
-    connected = False
-    active = False
 
-    status_callback = NotImplemented.raise_this
-    error_fallback = NotImplemented.raise_this
-    confirmation_callback = NotImplemented.raise_this
+    stop_serial_processing_event = Event()
+
+    serial_thread: Thread = None
+    lock = Lock()
+
+    inboundQueue = Queue()
+    outboundQueue = Queue()
 
     def __init__(self):
         # move or remove?
@@ -44,8 +46,13 @@ class Controller:
                 self.bins[self.UNKNOWN] = (-1, -1)
 
         # init base variables
-        self.camera = Camera(self.recognize, self.process_object)
         self.port = self.find_controller()
+
+        self.serial_thread = Thread(
+            target=self.__serial_processing, name='serial')
+        self.serial_thread.daemon = True
+
+        print("Controller init")
 
     @property
     def labels(self) -> Iterable[str]:
@@ -62,10 +69,8 @@ class Controller:
         ports = serial.tools.list_ports.comports()
         return ports
 
-    def get_camera(self):
-        return self.camera
-
-    def find_controller(self):
+    @staticmethod
+    def find_controller():
         portsFound = Controller.get_ports()
         comPort = 'None'
         numConnection = len(portsFound)
@@ -89,52 +94,47 @@ class Controller:
 
         return comPort
 
+    def start_processing(self):
+        self.stop_processing()
+        self.stop_serial_processing_event.clear()
+        self.serial_thread.start()
+
+    def stop_processing(self):
+        if self.serial_thread is not None and self.serial_thread.is_alive():
+            self.stop_serial_processing_event.set()
+            self.serial_thread.join()
+
     def change_state(self, state: chr, bucket: chr = ''):
-        if not self.active:
+        if self.serial_thread is None or not self.serial_thread.is_alive():
             logger.error("Controller disconnected")
             raise NotConnectedToSorter
 
-        command = state + bucket
+        with self.lock:
+            self.inboundQueue.put(state + bucket)
 
-        self.arduino.write(bytes(command, 'utf-8'))
-        # blocking sleep
-        time.sleep(0.05)
-
-    def activate_camera(self):
-        self.camera.stop()
-        eventlet.sleep(0.1)
-        self.camera.gen_frames()
-
-    def connect(self, status_callback, confirmation_callback, error_fallback):
+    def connect(self):
         if self.port == 'None':
             logger.error('No port selected')
             raise NoSorter
 
-        self.arduino = serial.Serial(self.port, 9600)
-        eventlet.sleep(2)
-        self.active = True
-
-        self.status_callback = status_callback
-        self.confirmation_callback = confirmation_callback
-        self.error_fallback = error_fallback
+        self.start_processing()
 
         logger.info('Controller connected')
-        self.process()
 
     def wait(self):
         logger.info('Wait state called')
         self.change_state('W')
 
     def run(self):
-        if not self.active:
+        if self.serial_thread is None or not self.serial_thread.is_alive():
             logger.error("Controller disconnected")
+            return
 
         logger.info('Run state called')
-        self.camera.capture_background()
         self.change_state('M')
 
     def select(self, bucket: chr):
-        if not self.active:
+        if self.serial_thread is None or not self.serial_thread.is_alive():
             logger.error("Controller disconnected")
 
         logger.info(f'Select state called with bucket {bucket}')
@@ -145,47 +145,67 @@ class Controller:
         self.change_state('R')
 
     def disconnect(self):
-        self.active = False
-
-        self.camera.stop()
+        self.stop_processing()
 
         logger.info('Controller disconnected')
 
-    def process(self):
-        while self.active:
-            eventlet.sleep(1)
-            data = self.arduino.readline()
-            self.process_controller_data(str(data))
+    def __serial_processing(self):
+        with self.lock:
+            port = self.port
 
-    def process_object(self):
-        logger.info(f'Recognize stopped object here')
-        self.select("D")  # TODO: replace with bucket selection
+        arduino = serial.Serial(port, 9600)
 
-    def process_controller_data(self, data):
+        while True:
+            if self.stop_serial_processing_event.is_set():
+                break
+
+            data = arduino.readline()
+            self.__process_response_data(str(data))
+
+            with self.lock:
+                if not self.inboundQueue.empty():
+                    command = self.inboundQueue.get()
+                    arduino.write(bytes(command, 'utf-8'))
+                    time.sleep(0.05)
+
+    def __process_response_data(self, data):
         data = data[2:-3]
         print(data)
         param_list = data.split(":")
 
+        response = None
+
         match param_list[0]:
             case "S":
-                status = {'state': param_list[1],
-                          'time_on_state': param_list[2],
-                          'vibro_state': param_list[3],
-                          'conveyor_state': param_list[4]}
+                # status message from arduino controller
+                response = {'message_type': 'S',
+                            'state': param_list[1],
+                            'time_on_state': param_list[2],
+                            'vibro_state': param_list[3],
+                            'conveyor_state': param_list[4]}
 
-                self.status_callback(status)
+                logger.info(response)
             case "C":
                 # confirmation message from arduino controller
-                confirmation_message = param_list[1]
-                logger.info(confirmation_message)
+                response = {'message_type': 'C',
+                            'message': param_list[1]}
 
-                self.confirmation_callback(confirmation_message)
+                logger.info(response)
             case "E":
                 # error message from arduino controller
-                error_message = param_list[1]
-                logger.error(error_message)
+                response = {'message_type': 'E',
+                            'message': param_list[1]}
 
-                self.error_fallback(error_message)
+                logger.error(response)
             case "D":
                 # debug message from arduino controller. Just log it
                 logger.info(param_list[1])
+
+        with self.lock:
+            self.outboundQueue.put(response)
+
+    def get_next_message(self) -> dict:
+        response = None
+        if not self.outboundQueue.empty():
+            response = self.outboundQueue.get()
+        return response

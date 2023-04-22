@@ -1,30 +1,37 @@
 import logging
+from threading import Event, Lock, Thread
 import cv2
+from lib.controller import Controller
 from lib.pipe_utils import *
-from lib.exceptions import NotImplemented
 import eventlet
 
 
 class Camera():
-
     logger = logging.getLogger(__name__)
-    CAMERA_ID = 0
 
+    CAMERA_ID = 0
     cam = cv2.VideoCapture(CAMERA_ID, cv2.CAP_DSHOW)
 
-    need_capture_back_flag = False
+    stopCameraEvent = Event()
+    frameReadyEvent = Event()
+    captureBackgroundEvent = Event()
 
-    stop_callback = NotImplemented.raise_this
-    process_callback = NotImplemented.raise_this
+    lock = Lock()
+    output_frame = None
+    video_thread = None
 
-    frame_buffer = []
-    frame_ready_semaphore = False
-    camera_active = False
+    def __init__(self) -> None:
+        self.video_thread = Thread(target=self.__gen_frames, name='video')
+        self.video_thread.daemon = True
 
-    def __init__(self, process_callback, stop_callback) -> None:
+        self.reset_camera(self.CAMERA_ID)
+
+    def reset_camera(self, cam_id, exposure=-10.0):
         if not self.cam.isOpened():
             logger.error('Cannot open camera, exiting')
             return
+
+        self.cam = cv2.VideoCapture(cam_id, cv2.CAP_DSHOW)
 
         self.cam.set(cv2.CAP_PROP_FPS, FPS_RATE)
         self.cam.set(cv2.CAP_PROP_FOURCC,
@@ -33,29 +40,33 @@ class Camera():
                      cv2.VideoWriter.fourcc('M', 'J', 'P', 'G'))
         self.cam.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_SIZE[1])
         self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_SIZE[0])
-        self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
-        self.cam.set(cv2.CAP_PROP_EXPOSURE, -10.0)
+        # self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
+        # self.cam.set(cv2.CAP_PROP_EXPOSURE, exposure)
 
-        self.process_callback = process_callback
-        self.stop_callback = stop_callback
+        if not self.video_thread.is_alive():
+            self.stopCameraEvent.clear()
+            self.video_thread.start()
 
-    def init_back_sub(frame):
+    def init_back_sub(self, frame):
         back_sub = cv2.createBackgroundSubtractorMOG2(
             history=100, varThreshold=20.0, detectShadows=True)
         back_sub.apply(frame, learningRate=1)
         return back_sub
 
-    def gen_frames(self):
+    def __gen_frames(self):
         frame_count = 0
         back_sub = None
         obj_tracker = None
         obj_bbox = None
         obj_moved = False
 
-        self.camera_active = True
+        controller = Controller()
 
-        while self.camera_active:
-            eventlet.sleep(0)
+        while True:
+            if self.stopCameraEvent.is_set():
+                logger.info("CameraStop event recieved by gen_frames")
+                break
+
             ret, frame = self.cam.read()
             if not ret:
                 self.logger.error('Cannot grab frame from camera, exiting')
@@ -83,7 +94,9 @@ class Camera():
                     if obj_tracker is None:
                         # New object, setup a tracker
                         self.logger.info(f'New object detected at {obj_bbox}')
-                        self.stop_callback()
+
+                        controller.recognize()
+
                         obj_tracker = self.init_back_sub(frame)
                         obj_moved = True
                     else:
@@ -98,7 +111,8 @@ class Camera():
 
                                 # Detect label and proceed with controller
                                 # label = choice(self.controller.labels)
-                                self.process_callback()
+                                # TODO: remove and replace with label
+                                controller.select("D")
                         else:
                             obj_bbox = new_bbox
                             obj_moved = True
@@ -106,38 +120,52 @@ class Camera():
             if obj_bbox is not None:
                 green_rect(frame, obj_bbox)
 
-            show_frame(frame)
             frame_count += 1
 
-            if self.need_capture_back_flag:
-                self.need_capture_back_flag = False
+            if self.captureBackgroundEvent.is_set():
+                self.captureBackgroundEvent.clear()
 
                 back_sub = self.init_back_sub(frame)
                 obj_bbox = None
                 obj_tracker = None
                 self.logger.info('Background captured')
 
-            ret, buffer = cv2.imencode('.jpg', frame)
-            self.frame_buffer = buffer.tobytes()
-            self.frame_ready_semaphore = True
-            # frame = buffer.tobytes()
-            # yield (b'--frame\r\n'
-            #       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')  # concat frame one by one and show result
+            with self.lock:
+                self.output_frame = frame.copy()
 
     def get_video_stream(self):
-        while self.camera_active:
+        while True:
+            # make eventlet scheduler start another tasks
             eventlet.sleep(0)
-            if self.frame_ready_semaphore:
-                self.frame_ready_semaphore = False
 
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + self.frame_buffer + b'\r\n')  # concat frame one by one and show result
+            # listen to stop camera event
+            if self.stopCameraEvent.is_set():
+                logger.info("CameraStop event received by get_video_stream")
+                break
+
+            # wait until the lock is acquired
+            with self.lock:
+                # check if the output frame is available, otherwise skip
+                # the iteration of the loop
+                if self.output_frame is None:
+                    continue
+
+                # encode the frame in JPEG format
+                (flag, encodedImage) = cv2.imencode(".jpg", self.output_frame)
+                # ensure the frame was successfully encoded
+                if not flag:
+                    continue
+
+            # yield the output frame in the byte format
+            yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
 
     def capture_background(self):
-        self.need_capture_back_flag = True
+        self.captureBackgroundEvent.set()
 
     def stop(self):
-        self.camera_active = False
+        if self.video_thread is not None and self.video_thread.is_alive():
+            self.stopCameraEvent.set()
+            self.video_thread.join()
 
     @staticmethod
     def get_camera_indexes():
@@ -146,6 +174,7 @@ class Camera():
         arr = []
         i = 10
         while i > 0:
+            # make eventlet scheduler start another tasks
             eventlet.sleep(0)
             cap = cv2.VideoCapture(index)
             if cap.read()[0]:
