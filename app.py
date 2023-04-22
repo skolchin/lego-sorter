@@ -1,4 +1,5 @@
-import eventlet
+import gevent
+from gevent.event import Event
 import json
 import logging
 
@@ -8,11 +9,10 @@ from lib.controller import Controller
 from lib.camera import Camera
 from lib.pipe_utils import *
 
-
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 
-socketio = SocketIO(app, async_mode='eventlet',
+socketio = SocketIO(app, async_mode='gevent',
                     logger=True, engineio_logger=True)
 
 logging.basicConfig(level=logging.INFO)
@@ -80,7 +80,7 @@ def message_listener():
                 case _:
                     logger.error(f"Incorrect message type {mtype}")
 
-        eventlet.sleep(1)
+        gevent.sleep(1)
 
 
 @socketio.on('connect', namespace="/sorter")
@@ -121,11 +121,8 @@ def sorter_stop(message):
 def sorter_disconnect():
     camera.stop()
     controller.disconnect()
-    socketio.stop()
 
-    pool = eventlet.GreenPool()
-    for p in pool:
-        eventlet.kill(p)
+    socketio.wsgi_server.stop()
 
     logger.info("User interface disconnected")
 

@@ -7,4 +7,5 @@ tensorflow_addons
 pyserial 
 Flask
 flask-socketio
-eventlet
+gevent
+gevent-websocket

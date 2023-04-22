@@ -3,7 +3,7 @@ from threading import Event, Lock, Thread
 import cv2
 from lib.controller import Controller
 from lib.pipe_utils import *
-import eventlet
+import gevent
 
 
 class Camera():
@@ -135,8 +135,8 @@ class Camera():
 
     def get_video_stream(self):
         while True:
-            # make eventlet scheduler start another tasks
-            eventlet.sleep(0)
+            # make gevent scheduler start another tasks
+            gevent.sleep(0)
 
             # listen to stop camera event
             if self.stopCameraEvent.is_set():
@@ -174,8 +174,8 @@ class Camera():
         arr = []
         i = 10
         while i > 0:
-            # make eventlet scheduler start another tasks
-            eventlet.sleep(0)
+            # make gevent scheduler start another tasks
+            gevent.sleep(0)
             cap = cv2.VideoCapture(index)
             if cap.read()[0]:
                 arr.append(index)

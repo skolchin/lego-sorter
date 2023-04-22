@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 class Controller:
     """ HW controller 
         There is only one sorter can be controlled by appliciation, so we use Singleton pattern 
-        We use eventlet.sleep() to release process for eventlet async scheduler. 
     """
     def __new__(cls):
         if not hasattr(cls, 'instance'):
