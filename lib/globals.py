@@ -26,7 +26,6 @@ CHECKPOINT_DIR = os.path.join(ROOT_DIR, 'checkpoints')
 OUTPUT_DIR = os.path.join(ROOT_DIR, 'out')
 """ Output dir """
 
-
 BATCH_SIZE = 32
 """ Batch size """
 

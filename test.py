@@ -80,7 +80,6 @@ def main(argv):
 
     elif FLAGS.confusion:
         # plot confusion matrix
-        # _, test_data = split_dataset(image_data)
         true_labels, pred_labels = predict_dataset(model, image_data.tfds)
         plot_confusion_matrix(true_labels, pred_labels, image_data.class_names)
         

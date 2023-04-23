@@ -9,7 +9,7 @@ import tensorflow_addons as tfa
 import matplotlib.pyplot as plt
 from absl import flags
 from keras.utils import image_dataset_from_directory
-from collections import namedtuple
+from dataclasses import dataclass
 from functools import partial
 from itertools import zip_longest
 from typing import Tuple, Iterable
@@ -21,14 +21,24 @@ FLAGS = flags.FLAGS
 flags.DEFINE_float('zoom_factor', 0.3, help='Maximum zoom level for image augmentation')
 flags.DEFINE_float('brightness_factor', 0.3, help='Maximum brightness level for image augmentation')
 flags.DEFINE_float('rotation_factor', 0.45, help='Maximum rotation in image augmentation')
-flags.DEFINE_float('edge_emboss', 0.0, lower_bound=0.0, help='Edge embossing factor')
+flags.DEFINE_float('edge_emboss', 0.5, lower_bound=0.0, help='Edge embossing factor')
 
 tf.get_logger().setLevel('ERROR')
 
-ImageDataset = namedtuple('ImageDataset', ['tfds', 'num_files', 'class_names'])
-""" Dataset with extra info """
+@dataclass
+class ImageDataset:
+    """ Dataset with extra info resulting from `load_dataset()` call """
+    tfds: tf.data.Dataset
+    """ actual tensorflow dataset """
+
+    num_files: int
+    """ number of image files in a dataset """
+
+    class_names: Iterable[str]
+    """ class names """
 
 def _sobel_edges(images):
+    """ Internal - applies edges filter on gray image """
     shape = images.shape
     if len(shape) == 3: images = tf.expand_dims(images, 0)
     grad_components = tf.image.sobel_edges(images)
@@ -39,6 +49,7 @@ def _sobel_edges(images):
     return images
 
 def _wireframe(images):
+    """ Internal - generates wireframe image """
     shape = images.shape
     if len(shape) == 3: images = tf.expand_dims(images, 0)
 
@@ -105,7 +116,8 @@ def _drop_seed(feature, label, seed):
     return feature, label
 
 def load_dataset() -> ImageDataset:
-    """ Load images as dataset """
+    """ Load images into a dataset """
+
     seed = np.random.randint(1e6)
     ds = image_dataset_from_directory(
         IMAGE_DIR,
@@ -338,7 +350,7 @@ def show_prediction_samples(
     plt.figure(figsize=(8, 8))
     cmap = 'gray' if FLAGS.gray or FLAGS.edges else None
     for images, labels in get_dataset_samples(tfds):
-        for i in range(num_samples):
+        for i in range(min(num_samples, labels.shape[0])):
             _ = plt.subplot(int(num_samples/3), int(num_samples/3), i + 1)
             label = class_names[np.argmax(labels[i])]
             image = images[i].numpy()

@@ -12,7 +12,7 @@ from time import time
 from collections import defaultdict, namedtuple
 from typing import Generator, List, Callable, Tuple, Optional
 
-from lib.globals import OUTPUT_DIR
+from .globals import OUTPUT_DIR
 from .pipe_utils import bgmask_to_bbox, extract_roi
 
 FLAGS = flags.FLAGS
@@ -37,17 +37,17 @@ def _max_prob_detection(detections: List[Detection]) -> Detection:
     idx = np.argmax(probs)
     return detections[idx]
 
-def _max_vote_detection(detections: List[Detection]) -> Detection:
-    """ Internal - choose detection with maximum votes """
+def _max_rating_detection(detections: List[Detection]) -> Detection:
+    """ Internal - choose detection with maximum rating """
     counter, last_entry = defaultdict(list), {}
     for n, d in enumerate(detections):
         counter[d[1]].append(d[2])
         last_entry[d[1]] = n
 
-    votes = {k: sum(v) for k, v in counter.items()}
-    _logger.debug(f'Votes: {votes}')
+    rating = {k: sum(v) for k, v in counter.items()}
+    _logger.debug(f'Rating: {rating}')
 
-    label = max(votes, key=lambda x: votes[x])
+    label = max(rating, key=lambda x: rating[x])
     return detections[last_entry[label]]
 
 class ObjectState(IntEnum):
@@ -78,10 +78,10 @@ def track(cam: cv2.VideoCapture, replace_bg_color: Tuple[int] = None):
         replace_bg_color: if not `None`, background of an object detected will be erased and replaced with given color
 
     Yields:
-        `(frame, obj_bbox, obj_state)` tuple containing:
+        `(frame, bbox, state)` tuple containing:
             `frame`: a frame obtained from the source,
-            `obj_bbox`: bounding box of object detected or `None` if no objects found,
-            `obj_state`: one of `ObjectState` constants.
+            `bbox`: bounding box of object detected or `None` if no objects found,
+            `state`: one of `ObjectState` constants.
 
     Examples:
         >>> cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
@@ -137,7 +137,6 @@ def track(cam: cv2.VideoCapture, replace_bg_color: Tuple[int] = None):
 
             if replace_bg_color:
                 frame[bgmask!=255] = replace_bg_color
-                # frame = bgmask
 
         yield frame, obj_bbox, obj_state
 
@@ -146,7 +145,7 @@ def track_detect(
     detect_callback: Callable[[np.ndarray], List],
     track_time: float = 2.0,
     replace_bg_color: Tuple[int] = None,
-    use_voting: bool = True) -> Generator[np.ndarray, Tuple[int], Optional[Detection]]:
+    use_rating: bool = True) -> Generator[np.ndarray, Tuple[int], Optional[Detection]]:
 
     """ Tracks and classifies objects on a video stream.
 
@@ -162,17 +161,17 @@ def track_detect(
         cam:    frame source (camera or video)
         detect_callback:    A callback which must accept a ROI of object detected and return
             a list contaiting `(label, probability)` tuples sorted descending on probability.
-            Only 1st element of that iterable is used.
+            Only 1st element of that iterable is used currently.
         track_time:     time limit to perform initial frame collection (in seconds)
         replace_bg_color: if not `None`, background of an object detected will be erased and replaced with given color
-        use_voting: if `True` (default), uses some kind of voting mechanism to determine best detection from collected list.
+        use_rating: if `True` (default), uses rating mechanism to determine best detection from collected list.
             Otherwise, selects detection with highest probability.
 
     Yields:
-        `(frame, obj_bbox, detection)` tuple containing:
-            `frame`: a frame obtained from the source,
-            `obj_bbox`: bounding box of object detected or `None` if no objects found
-            `detection`: a `Detection` object.
+        `(frame, bbox, detection)` tuple containing:
+            `frame`: a frame obtained from the source
+            `bbox`: bounding box of object detected or `None` if no objects found
+            `detection`: a `Detection` object of `None` if no detections is done
         
     """
 
@@ -213,13 +212,13 @@ def track_detect(
                     else:
                         detections.append(Detection(roi, roi_label, roi_prob, bbox))
                         if FLAGS.save_roi:
-                            # Take and save ROI without zoom
+                            # Take ROI without zoom and save it to out\roi
                             pure_roi = extract_roi(frame, bbox, zoom=0.0)
                             cv2.imwrite(os.path.join(OUTPUT_DIR, 'roi', f'{roi_label}_{frame_count:04d}.png'), pure_roi)
 
                 elif detections:
-                    # Time elapsed, find best prediction and translate it to the caller
-                    detection = _max_vote_detection(detections)
+                    # Time's out, find best prediction and pass it to the caller
+                    detection = _max_rating_detection(detections) if use_rating else _max_prob_detection(detections)
                     _logger.debug(f'Detection loop finished, {detection.label} label selected')
                     detections = []
 

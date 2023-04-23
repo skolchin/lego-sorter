@@ -24,10 +24,10 @@ flags.declare_key_flag('edges')
 flags.declare_key_flag('zoom')
 
 del FLAGS.zoom_factor
-flags.DEFINE_float('zoom_factor', 2.0, help='ROI zoom factor')
-flags.DEFINE_integer('camera', 0, short_name='c', help='Camera ID')
+flags.DEFINE_float('zoom_factor', 2.6, help='ROI zoom factor')
+flags.DEFINE_integer('camera', 0, short_name='c', help='Camera ID (0,1,...)')
 flags.DEFINE_string('file', None, short_name='f', help='Process video from given file')
-flags.DEFINE_boolean('debug', False, help='Start with debug info displayed')
+flags.DEFINE_boolean('debug', False, help='Start with debug info')
 flags.DEFINE_boolean('save_video', False, help='Start with video capture')
 
 HELP_INFO = 'Press ESC or Q to quit, S for camera settings, C for video capture'
