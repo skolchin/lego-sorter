@@ -1,5 +1,4 @@
 import gevent
-from gevent.event import Event
 import json
 import logging
 
@@ -12,8 +11,8 @@ from lib.pipe_utils import *
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 
-socketio = SocketIO(app, async_mode='gevent',
-                    logger=True, engineio_logger=True)
+# , logger=True, engineio_logger=True)
+socketio = SocketIO(app, async_mode='gevent')
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -67,18 +66,18 @@ def index():
 def message_listener():
     while session['connected'] == 1:
         message = controller.get_next_message()
-        if message is not None and 'mtype' in message.keys():
-            mtype = message['mtype']
+        if message is not None and 'message_type' in message.keys():
+            msg_type = message['message_type']
 
-            match mtype:
+            match msg_type:
                 case "S":
                     emit('status', message)
                 case "C":
-                    emit('confirmation', {'message': message})
+                    emit('confirmation', message)
                 case "E":
-                    emit('error', {'message': message})
+                    emit('error', message)
                 case _:
-                    logger.error(f"Incorrect message type {mtype}")
+                    logger.error(f"Incorrect message type {msg_type}")
 
         gevent.sleep(1)
 
@@ -95,6 +94,24 @@ def sorter_start(message):
 
     logger.info("Sorter connected")
     message_listener()
+
+
+@socketio.on('select_camera', namespace='/sorter')
+def select_camera(message):
+    data: dict = json.loads(message)
+    if "camera_id" in data.keys():
+        auto_exposure = 0
+        exposure = -10
+
+        if "auto_exposure" in data.keys():
+            auto_exposure = data["auto_exposure"]
+
+        if "exposure" in data.keys():
+            exposure = data["exposure"]
+
+        camera.reset_camera(data["camera_id"], auto_exposure, exposure)
+    else:
+        logger.error("Incorrect message for select_camera request")
 
 
 @socketio.on('run', namespace='/sorter')
@@ -123,9 +140,10 @@ def sorter_disconnect():
     controller.disconnect()
 
     socketio.wsgi_server.stop()
+    socketio.wsgi_server.close()
 
     logger.info("User interface disconnected")
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, use_reloader=False)
+    socketio.run(app)  # , debug=True, use_reloader=False)

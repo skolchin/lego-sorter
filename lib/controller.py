@@ -11,7 +11,7 @@ import serial
 import serial.tools.list_ports
 import time
 from typing import Tuple, Iterable
-from lib.exceptions import NoSorter, NotConnectedToSorter, NotImplemented
+from lib.exceptions import NoSorter, NotConnectedToSorter
 
 from .globals import ROOT_DIR
 
@@ -37,6 +37,8 @@ class Controller:
     inboundQueue = Queue()
     outboundQueue = Queue()
 
+    current_state: chr = ''
+
     def __init__(self):
         # move or remove?
         with open(os.path.join(ROOT_DIR, 'lib', 'bins.json'), 'r') as fp:
@@ -50,8 +52,6 @@ class Controller:
         self.serial_thread = Thread(
             target=self.__serial_processing, name='serial')
         self.serial_thread.daemon = True
-
-        print("Controller init")
 
     @property
     def labels(self) -> Iterable[str]:
@@ -109,7 +109,9 @@ class Controller:
             raise NotConnectedToSorter
 
         with self.lock:
-            self.inboundQueue.put(state + bucket)
+            obj = state + bucket
+            logger.info(f"Inbound queue put {obj}")
+            self.inboundQueue.put(obj)
 
     def connect(self):
         if self.port == 'None':
@@ -154,51 +156,87 @@ class Controller:
 
         arduino = serial.Serial(port, 9600)
 
+        confirmation_wait = False
+        current_command = None
+
         while True:
             if self.stop_serial_processing_event.is_set():
                 break
 
             data = arduino.readline()
-            self.__process_response_data(str(data))
+            params = self.__prepare_params(data)
+
+            match params[0]:
+                case "C":
+                    # confirmation
+                    if current_command in params[1]:
+                        logger.info(f"Command {current_command} confirmed")
+                        confirmation_wait = False
+                    else:
+                        logger.error(
+                            f"Command {current_command} unconfirmed. Confirmation for {params}")
+                case "E":
+                    # error
+                    confirmation_wait = False
+
+            self.__process_response_data(params)
 
             with self.lock:
-                if not self.inboundQueue.empty():
-                    command = self.inboundQueue.get()
-                    arduino.write(bytes(command, 'utf-8'))
-                    time.sleep(0.05)
+                if not self.inboundQueue.empty() and not confirmation_wait:
+                    prev_command = current_command
+                    logger.info(f"Previous command is {prev_command}")
+                    current_command = self.inboundQueue.get()
+                    logger.info(f"Inbound queue get command {current_command}")
 
-    def __process_response_data(self, data):
-        data = data[2:-3]
-        print(data)
-        param_list = data.split(":")
+                    if prev_command != current_command:
+                        arduino.write(bytes(current_command, 'utf-8'))
+                        time.sleep(0.1)
+                        logger.info(
+                            f"Command {current_command} sent; Wait for confirmation")
+                        confirmation_wait = True
+                    else:
+                        logger.info(
+                            f"Duplicated command {current_command}. Ignore.")
 
+    def __prepare_params(self, data):
+        sdata = str(data)[2:-3]
+        return sdata.split(":")
+
+    def __process_response_data(self, params):
         response = None
 
-        match param_list[0]:
+        match params[0]:
             case "S":
                 # status message from arduino controller
-                response = {'message_type': 'S',
-                            'state': param_list[1],
-                            'time_on_state': param_list[2],
-                            'vibro_state': param_list[3],
-                            'conveyor_state': param_list[4]}
+                self.current_state = params[1]
+                try:
+                    response = {'message_type': 'S',
+                                'state': params[1],
+                                'time_on_state': params[2],
+                                'vibro_state': params[3],
+                                'conveyor_state': params[4]}
 
-                logger.info(response)
+                    logger.info(response)
+                except Exception as e:
+                    response = {'message_type': 'E',
+                                'message': f"Exception while status decode: {str(e)}; status is: {params}"}
+
+                    logger.error(response)
             case "C":
                 # confirmation message from arduino controller
                 response = {'message_type': 'C',
-                            'message': param_list[1]}
+                            'message': params[1]}
 
                 logger.info(response)
             case "E":
                 # error message from arduino controller
                 response = {'message_type': 'E',
-                            'message': param_list[1]}
+                            'message': params[1]}
 
                 logger.error(response)
             case "D":
                 # debug message from arduino controller. Just log it
-                logger.info(param_list[1])
+                logger.info(params[1])
 
         with self.lock:
             self.outboundQueue.put(response)

@@ -21,12 +21,9 @@ class Camera():
     video_thread = None
 
     def __init__(self) -> None:
-        self.video_thread = Thread(target=self.__gen_frames, name='video')
-        self.video_thread.daemon = True
-
         self.reset_camera(self.CAMERA_ID)
 
-    def reset_camera(self, cam_id, exposure=-10.0):
+    def reset_camera(self, cam_id, auto_exposure=0, exposure=-10.0):
         if not self.cam.isOpened():
             logger.error('Cannot open camera, exiting')
             return
@@ -40,12 +37,17 @@ class Camera():
                      cv2.VideoWriter.fourcc('M', 'J', 'P', 'G'))
         self.cam.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_SIZE[1])
         self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_SIZE[0])
-        # self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
-        # self.cam.set(cv2.CAP_PROP_EXPOSURE, exposure)
+        self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, auto_exposure)
+        self.cam.set(cv2.CAP_PROP_EXPOSURE, exposure)
 
-        if not self.video_thread.is_alive():
-            self.stopCameraEvent.clear()
-            self.video_thread.start()
+        self.stop()
+
+        self.video_thread = Thread(target=self.__gen_frames, name='video')
+        self.video_thread.daemon = True
+        self.stopCameraEvent.clear()
+        logger.info("Starting video thread")
+        self.video_thread.start()
+        logger.info("Video thread started")
 
     def init_back_sub(self, frame):
         back_sub = cv2.createBackgroundSubtractorMOG2(
