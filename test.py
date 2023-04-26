@@ -48,6 +48,9 @@ def plot_confusion_matrix(actual, predicted, class_names):
     plt.show()
 
 FLAGS = flags.FLAGS
+
+del FLAGS.zoom_factor
+flags.DEFINE_multi_float('zoom_factor', None, help='ROI zoom factor', short_name='zf')
 flags.DEFINE_multi_string('file', None, 'Predict for image file(-s)', short_name='f')
 flags.DEFINE_string('label', None, 'Predict for specific label', short_name='c')
 flags.DEFINE_boolean('confusion', None, 'Plot confusion matrix', short_name='m')
@@ -71,12 +74,16 @@ def main(argv):
         show_prediction_samples(model, label_data, image_data.class_names)
 
     elif FLAGS.file:
-        # prediction for given file(s)
+        # prediction for given file(s), optionally with zoom
         true_labels = [get_file_label(fn) for fn in FLAGS.file]
-        # predict_image_files(model, FLAGS.file, image_data.class_names, true_labels)
-        zoom_levels = [x/100.0 for x in range(100, 350, 25)]
-        predict_image_files_zoom(model, FLAGS.file, image_data.class_names, true_labels, zoom_levels, 
-            show_processed_image=True)
+        if not FLAGS.zoom_factor:
+            predict_image_files(model, FLAGS.file, image_data.class_names, true_labels)
+        else:
+            zoom_levels = FLAGS.zoom_factor
+            if len(FLAGS.zoom_factor) == 1 and FLAGS.zoom_factor[0] == 0.0:
+                zoom_levels = [x/100.0 for x in range(100, 350, 25)]
+            predict_image_files_zoom(model, FLAGS.file, image_data.class_names, true_labels, zoom_levels, 
+                show_processed_image=True)
 
     elif FLAGS.confusion:
         # plot confusion matrix

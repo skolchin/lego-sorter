@@ -24,11 +24,12 @@ flags.declare_key_flag('edges')
 flags.declare_key_flag('zoom')
 
 del FLAGS.zoom_factor
-flags.DEFINE_float('zoom_factor', 2.6, help='ROI zoom factor')
+flags.DEFINE_float('zoom_factor', 2.5, short_name='zf', help='ROI zoom factor')
 flags.DEFINE_integer('camera', 0, short_name='c', help='Camera ID (0,1,...)')
 flags.DEFINE_string('file', None, short_name='f', help='Process video from given file')
 flags.DEFINE_boolean('debug', False, help='Start with debug info')
 flags.DEFINE_boolean('save_video', False, help='Start with video capture')
+flags.DEFINE_boolean('save_roi', False, help='Save detected ROI images to out/roi directory')
 
 HELP_INFO = 'Press ESC or Q to quit, S for camera settings, C for video capture'
 
@@ -65,7 +66,7 @@ def main(_):
 
     frame_count = 0
     roi = None
-    roi_caption = None
+    ref = None
     roi_label = None
     video_out = None
     show_debug = FLAGS.debug
@@ -81,44 +82,40 @@ def main(_):
         status_info.append('Starting video output to %s', fn)
         video_out = cv2.VideoWriter(fn, cv2.VideoWriter_fourcc(*'mp4v'), 30.0, tuple(reversed(FRAME_SIZE)))
 
-    for (frame, roi_bbox, detection) in track_detect(cam, 
-                            lambda roi: predict_image_probs(model, roi, class_names), 
-                            track_time=2.0,
-                            replace_bg_color=(255,255,255)):
+    for detection in track_detect(
+        cam, 
+        lambda roi: predict_image_probs(model, roi, class_names), 
+        track_time=3.0,
+        replace_bg_color=(255,255,255),
+        save_roi=FLAGS.save_roi):
 
-        if detection is None:
-            roi = None
-            roi_caption = None
-            roi_label = None
-        else:
+        if detection.label and detection.label != roi_label:
+            roi_label = detection.label
             roi = detection.roi
-            if detection.label != roi_label:
-                roi_label = detection.label
-                roi_caption = f'{detection.label} ({detection.prob:.2%})'
-                status_info.append(f'Detection: {roi_caption}')
+            ref = ref_images.get(detection.label)
+            roi_caption = f'{detection.label} ({detection.prob:.2%})'
+            status_info.append(f'Detection: {roi_caption}')
+            if show_preprocessed:
+                roi = preprocess_image(roi)
+                ref = preprocess_image(ref)
+            if show_debug:
+                show_roi_window(roi, roi_caption)
+                show_ref_window(ref, roi_label)
 
+        frame = detection.frame
         if show_preprocessed:
             frame = preprocess_image(frame)
         else:
             status_info.apply(frame)
-            if roi_bbox is not None:
-                green_rect(frame, roi_bbox)
+            if detection.bbox is not None:
+                green_rect(frame, detection.bbox)
 
         show_frame(frame)
 
         if video_out is not None:
             video_out.write(frame)
 
-        if frame_count % 10 == 0 and show_debug:
-            ref = None 
-            if roi_label:
-                ref = ref_images.get(roi_label)
-                if show_preprocessed:
-                    roi = preprocess_image(roi)
-                    ref = preprocess_image(ref)
-                show_roi_window(roi, roi_caption)
-                show_ref_window(ref, roi_label)
-
+        if frame_count % FPS_RATE == 0 and show_debug:
             show_hist_window(frame, roi, ref, log_scale=True)
 
         frame_count += 1
