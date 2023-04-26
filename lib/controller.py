@@ -126,6 +126,10 @@ class Controller:
         logger.info('Wait state called')
         self.change_state('W')
 
+    def clean(self):
+        logger.info('Clean state called')
+        self.change_state('C')
+
     def run(self):
         if self.serial_thread is None or not self.serial_thread.is_alive():
             logger.error("Controller disconnected")
@@ -183,12 +187,10 @@ class Controller:
 
             with self.lock:
                 if not self.inboundQueue.empty() and not confirmation_wait:
-                    prev_command = current_command
-                    logger.info(f"Previous command is {prev_command}")
                     current_command = self.inboundQueue.get()
                     logger.info(f"Inbound queue get command {current_command}")
 
-                    if prev_command != current_command:
+                    if current_command != self.current_state:
                         arduino.write(bytes(current_command, 'utf-8'))
                         time.sleep(0.1)
                         logger.info(
@@ -196,7 +198,7 @@ class Controller:
                         confirmation_wait = True
                     else:
                         logger.info(
-                            f"Duplicated command {current_command}. Ignore.")
+                            f"Already in state {self.current_state}. Command {current_command} ignored. ")
 
     def __prepare_params(self, data):
         sdata = str(data)[2:-3]

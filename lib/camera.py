@@ -37,8 +37,11 @@ class Camera():
                      cv2.VideoWriter.fourcc('M', 'J', 'P', 'G'))
         self.cam.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_SIZE[1])
         self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_SIZE[0])
-        self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, auto_exposure)
-        self.cam.set(cv2.CAP_PROP_EXPOSURE, exposure)
+        # self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, auto_exposure)
+        # self.cam.set(cv2.CAP_PROP_EXPOSURE, exposure)
+
+        # self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0)
+        # self.cam.set(cv2.CAP_PROP_EXPOSURE, 0)
 
         self.stop()
 
@@ -63,6 +66,7 @@ class Camera():
         obj_moved = False
 
         controller = Controller()
+        recognize_in_progress = False
 
         while True:
             if self.stopCameraEvent.is_set():
@@ -84,6 +88,7 @@ class Camera():
                         # Object is gone
                         self.logger.info('Object has left the building')
                         obj_tracker = None
+                        recognize_in_progress = False
 
                 elif obj_bbox[2] == FRAME_SIZE[1] and obj_bbox[3] == FRAME_SIZE[0]:
                     self.logger.error('Object is too big, resetting the pipe')
@@ -97,7 +102,9 @@ class Camera():
                         # New object, setup a tracker
                         self.logger.info(f'New object detected at {obj_bbox}')
 
-                        controller.recognize()
+                        if not recognize_in_progress:
+                            controller.recognize()
+                            recognize_in_progress = True
 
                         obj_tracker = self.init_back_sub(frame)
                         obj_moved = True

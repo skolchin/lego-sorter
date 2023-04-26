@@ -125,6 +125,11 @@ def sorter_wait(message):
     controller.wait()
 
 
+@socketio.on('clean', namespace='/sorter')
+def sorter_clean(message):
+    controller.clean()
+
+
 @socketio.on('disconnect_hw', namespace='/sorter')
 def sorter_stop(message):
     session['connected'] = 0
