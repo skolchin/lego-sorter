@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Image loading and processing functions
-# (c) kol, 2022-2023
+# (c) lego-sorter team, 2022-2023
 
 import os
 import numpy as np

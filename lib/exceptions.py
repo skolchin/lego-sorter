@@ -1,3 +1,6 @@
+# LEGO sorter project
+# HW controller Exceptions
+# (c) lego-sorter team, 2022-2023
 
 class NoSorter(Exception):
     def __init__(self, message="Unable to find lego sorter. Is it connected?"):

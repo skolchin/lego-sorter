@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Experiments with SSIM-based image classifications
-# (c) kol, 2022
+# (c) lego-sorter team, 2022-2023
 #
 # Actually these are not very successfull as images are quite different and cant be even properly aligned
 # Max.SSIM score achieved for test image is 0.53, which is quite below expected level

@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Object tracking functions
-# (c) kol, 2022-2023
+# (c) lego-sorter team, 2022-2023
 
 import os
 import cv2
@@ -100,7 +100,9 @@ def _max_rating_detection(detections: List[Detection]) -> Detection:
     label = max(rating, key=lambda x: rating[x])
     return detections[last_entry[label]]
 
-def track(cam: cv2.VideoCapture, replace_bg_color: Tuple[int] = None):
+def track(cam: cv2.VideoCapture, 
+            replace_bg_color: Tuple[int] = None,
+            frame_callback: Callable[[TrackObject], bool] = None):
 
     """ Detect objects on video stream.
 
@@ -111,7 +113,11 @@ def track(cam: cv2.VideoCapture, replace_bg_color: Tuple[int] = None):
     
     Arguments:
         cam:    frame source (camera or video)
-        replace_bg_color: if not `None`, background of an object detected will be erased and replaced with given color
+        replace_bg_color: if not `None`, background of an object detected will be erased 
+            and replaced with given color
+        frame_callback: a callback function, which receives a track detection object and
+            should return either `True` to continue tracking or `False` to immediatelly
+            stop the loop and exit
 
     Yields:
         `TrackObject` object
@@ -171,7 +177,13 @@ def track(cam: cv2.VideoCapture, replace_bg_color: Tuple[int] = None):
             if replace_bg_color:
                 frame[bgmask!=255] = replace_bg_color
 
-        yield TrackObject(frame, bgmask, obj_bbox, obj_state)
+        tro = TrackObject(frame, bgmask, obj_bbox, obj_state)
+        if frame_callback and not frame_callback(tro):
+            return False
+        
+        yield tro
+
+    return True
 
 def track_detect(
     cam: cv2.VideoCapture, 
@@ -179,7 +191,8 @@ def track_detect(
     track_time: float = 2.0,
     replace_bg_color: Tuple[int] = None,
     use_rating: bool = True,
-    save_roi: bool = False):
+    save_roi: bool = False,
+    frame_callback: Callable[[TrackObject], bool] = None):
 
     """ Tracks and classifies objects on a video stream.
 
@@ -201,6 +214,9 @@ def track_detect(
         use_rating: if `True` (default), uses rating mechanism to determine best detection from collected list.
             Otherwise, selects detection with highest probability.
         save_roi: if `True`, saves detected ROI images to out/roi directory
+        frame_callback: a callback function, which receives a track detection object and
+            should return either `True` to continue tracking or `False` to immediatelly
+            stop the loop and exit
 
     Yields:
         `Detection` object
@@ -214,7 +230,9 @@ def track_detect(
     image_count = 0
     run_time = datetime.now().strftime('%y%m%d%H%M%S')
 
-    for tro in track(cam):
+    for tro in track(
+        cam, 
+        frame_callback=frame_callback):
         frame_count += 1
         detection = Detection(tro.frame, tro.bbox)
         
@@ -242,11 +260,14 @@ def track_detect(
                     roi = extract_roi(frame, tro.bbox, zoom=FLAGS.zoom_factor)
                     roi_rgb = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
                     labels_probs = detect_callback(roi_rgb)
-                    _logger.debug(f'Top-3 detections: {labels_probs[:3]}')
+                    if not labels_probs:
+                        _logger.debug('Got no detections')
+                    else:
+                        _logger.debug(f'Top-3 detections: {labels_probs[:3]}')
 
-                    roi_label, roi_prob = labels_probs[0]
-                    if roi_prob >= FLAGS.min_confidence:
-                        detections.append(Detection(tro.frame, tro.bbox, roi, roi_label, roi_prob))
+                        roi_label, roi_prob = labels_probs[0]
+                        if roi_prob >= 0.3:
+                            detections.append(Detection(tro.frame, tro.bbox, roi, roi_label, roi_prob))
 
                 elif detections:
                     # Time's out, find best prediction and pass it to the caller
@@ -263,4 +284,3 @@ def track_detect(
                     detections = []
 
         yield detection
-

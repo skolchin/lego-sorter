@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Object tracking demo
-# (c) kol, 2022
+# (c) lego-sorter team, 2022-2023
 
 import cv2
 import logging

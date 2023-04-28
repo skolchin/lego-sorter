@@ -1,7 +1,7 @@
 # LEGO sorter project
 # CNN model definition and support functions
 # Based on standard VGG-16 architecture with additional layers to support transfer learning
-# (c) kol, 2022
+# (c) lego-sorter team, 2022-2023
 
 import os
 import tensorflow as tf

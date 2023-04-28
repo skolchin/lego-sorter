@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Capture a frame for further analysys
-# (c) kol, 2022
+# (c) lego-sorter team, 2022-2023
 
 import os
 import cv2

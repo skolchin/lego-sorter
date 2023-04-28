@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Video recognition pipeline demo
-# (c) kol, 2022
+# (c) lego-sorter team, 2022-2023
 
 import os
 import cv2

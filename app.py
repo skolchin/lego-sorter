@@ -1,48 +1,45 @@
-import gevent
+# LEGO sorter project
+# Main controller app
+# (c) lego-sorter team, 2022-2023
+
+import sys
 import json
 import logging
+import gevent
+from absl import flags
 
 from flask import Flask, render_template, session, Response
 from flask_socketio import SocketIO, emit, disconnect
-from lib.controller import Controller
+
+from lib.globals import *
+from lib.image_dataset import *
+from lib.dummy_controller import DummyController
 from lib.camera import Camera
-from lib.pipe_utils import *
+
+FLAGS = flags.FLAGS
+del FLAGS.zoom_factor
+flags.DEFINE_float('zoom_factor', 2.5, short_name='zf', help='ROI zoom factor')
+flags.DEFINE_boolean('debug', False, help='Start with debug info')
+
+logging.basicConfig(format='%(levelname)s: %(message)s')
+logger = logging.getLogger('lego-sorter')
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 
-# , logger=True, engineio_logger=True)
 socketio = SocketIO(app, async_mode='gevent')
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+controller = DummyController()
+camera = Camera(controller)
 
-controller = Controller()
-camera = Camera()
-
-ui_connected = False
-
-
-@app.before_first_request
-def setup():
-    logger.info("Before first request called")
-
+# @app.before_first_request
+# def setup():
+#     pass
 
 # REST endpoints
 @app.route('/list/ports')
 def ports_list():
-    portsFound = Controller.get_ports()
-    ports = {}
-
-    numConnection = len(portsFound)
-
-    for i in range(0, numConnection):
-        port = portsFound[i]
-        strPort = str(port)
-        splitPort = strPort.split(' ')
-        ports[splitPort[0]] = strPort[strPort.find('USB'):]
-
-    return Response(json.dumps(ports),  mimetype='application/json')
+    return Response(json.dumps(controller.get_ports()),  mimetype='application/json')
 
 
 @app.route('/list/cameras')
@@ -53,7 +50,8 @@ def camera_list():
 
 @app.route('/video_feed')
 def video_feed():
-    return Response(camera.get_video_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    camera.stop_video_stream()
+    return Response(camera.start_video_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 @app.route('/')
@@ -151,4 +149,6 @@ def sorter_disconnect():
 
 
 if __name__ == '__main__':
-    socketio.run(app)  # , debug=True, use_reloader=False)
+    FLAGS(sys.argv)
+    logger.setLevel(logging.DEBUG if FLAGS.debug else logging.INFO)
+    socketio.run(app)

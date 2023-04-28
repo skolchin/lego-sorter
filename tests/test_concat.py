@@ -1,6 +1,6 @@
 # LEGO sorter project
 # GRAY2RGB conversion tests
-# (c) kol, 2022
+# (c) lego-sorter team, 2022-2023
 
 import os
 import numpy as np

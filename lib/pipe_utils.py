@@ -1,21 +1,18 @@
 # LEGO sorter project
 # Pipeline support utils
-# (c) kol, 2022-2023
+# (c) lego-sorter team, 2022-2023
 
 import os
 import cv2
 import numpy as np
 import img_utils22 as imu
 import logging
-from absl import flags
 from typing import Iterable, Tuple
 
 from .globals import IMAGE_DIR
 from .status_info import StatusInfo
 
 logger = logging.getLogger('lego-tracker')
-
-FLAGS = flags.FLAGS
 
 FPS_RATE = 30
 FRAME_SIZE = (480, 640)

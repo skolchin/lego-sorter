@@ -1,5 +1,6 @@
 # Lego Sorter project
-(c) kol, 2022-2023
+
+(c) lego-sorter team (kol+chem), 2022-2023
 
 LegoSorter is an open-source project aiming to build a machine
 which would be able to recognize and, eventually, automatically sort
@@ -9,13 +10,13 @@ This repo contains a software part of the machine, hardware setup
 is performed behind the scenes.
 
 The project uses TensorFlow Google's library to perform
-Lego pieces image classification. Currently, it employs 
+Lego pieces image classification. Currently, it employs
 pre-made VGG-16 CNN trained in transfer learning mode on
 custom rendered Lego pieces image dataset.
 
 So far the project is in some king of R&D stage so no timings are set.
 We wil definetelly share the results to the public as soon as
-we got the :)
+we got the result :)
 
 ## Setup
 
@@ -23,9 +24,9 @@ Basic Python setup is required, see requirements.txt for list of packages.
 
 For training, Tensorflow's GPU version is recommended, see, for example,
 this [guide](https://towardsdatascience.com/how-to-finally-install-tensorflow-gpu-on-windows-10-63527910f255)
-on how to install it. For NVIDIA cards 
-it should be working fine with CUDA 11.2.0_460.89 and CUDNN 11.2_8.1.1.33 
-(available at my 
+on how to install it. For NVIDIA cards
+it should be working fine with CUDA 11.2.0_460.89 and CUDNN 11.2_8.1.1.33
+(available at
 [gdrive](https://drive.google.com/drive/folders/1OgHnA7X_Ey-GSy8eepNUFhnVercTeq_e?usp=share_link)).
 
 Pre-trained model checkpoints are also available at the link above.
@@ -37,7 +38,7 @@ Currently it was tested under Windows only, Linux support would come up later.
 
 ## Model training
 
-To perform model training, run `train.py` script. Several image augmentation modes 
+To perform model training, run `train.py` script. Several image augmentation modes
 are supported:
 
     -g, --gray  Convert images to grayscale
@@ -67,7 +68,7 @@ listed above and the following options:
     -f, --files     Run prediction over given files (could be specified more than once)
     -m, --confusion Build and show a confusion matrix
 
-If no options provided, the script would show some random prediction samples 
+If no options provided, the script would show some random prediction samples
 from images dataset.
 
 ## Inferrence
@@ -76,7 +77,7 @@ The `static_pipe.py` script is a prototype of the project's control panel. When 
 it will connect to a video camera and allow to classify Lego pieces put under
 that camera.
 
-All image augmentation modes are supported as script's options. 
+All image augmentation modes are supported as script's options.
 When started, several hot keys are available:
 
     B   Capture a static background (this must be done in order to detect new pieces)

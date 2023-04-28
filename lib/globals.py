@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Global flags
-# (c) kol, 2022
+# (c) lego-sorter team, 2022-2023
 
 import os
 from absl import flags
