@@ -16,6 +16,7 @@ flags.DEFINE_integer('camera', 0, short_name='c', help='Camera ID')
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+
 def main(_):
     if FLAGS.file:
         cam = cv2.VideoCapture(FLAGS.file)
@@ -47,6 +48,7 @@ def main(_):
             case 115:   # s
                 if not FLAGS.file:
                     cam.set(cv2.CAP_PROP_SETTINGS, 1)
+
 
 if __name__ == '__main__':
     app.run(main)
