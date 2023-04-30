@@ -79,14 +79,14 @@ def main(_):
 
     if FLAGS.save_video:
         fn = os.path.join(OUTPUT_DIR, f'pipe_{datetime.now().strftime("%y%m%d_%H%M%S")}.mp4')
-        status_info.append('Starting video output to %s', fn)
+        status_info.append(f'Starting video output to {fn}')
         video_out = cv2.VideoWriter(fn, cv2.VideoWriter_fourcc(*'mp4v'), 30.0, tuple(reversed(FRAME_SIZE)))
 
     def detect_callback(roi: np.ndarray):
-        labels, probs = predict_image_probs(model, roi, class_names)
+        preds = predict_image_probs(model, roi, class_names)
         if FLAGS.save_roi:
-            save_roi(roi, labels[0], probs[0])
-        return labels, probs
+            save_roi(roi, preds[0][0], preds[0][1])
+        return preds
 
     for detection in track_detect(
         cam, 
@@ -140,7 +140,7 @@ def main(_):
             case 99:    # c
                 if video_out is None:
                     fn = os.path.join(OUTPUT_DIR, f'pipe_{datetime.now().strftime("%y%m%d_%H%M%S")}.mp4')
-                    status_info.append('Starting video output to %s', fn)
+                    status_info.append(f'Starting video output to {fn}')
                     video_out = cv2.VideoWriter(fn, cv2.VideoWriter_fourcc(*'mp4v'), 30.0, tuple(reversed(FRAME_SIZE)))
                 else:
                     video_out.release()
