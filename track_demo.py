@@ -33,11 +33,11 @@ def main(_):
         cam.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_SIZE[0])
 
     frame_count = 0
-    for (frame, bbox, state) in track(cam, replace_bg_color=(255,255,255)):
-        if bbox is not None:
-            green_rect(frame, bbox)
+    for tro in track(cam, replace_bg_color=(255,255,255)):
+        if tro.bbox is not None:
+            green_rect(tro.frame, tro.bbox)
 
-        show_frame(frame)
+        show_frame(tro.frame)
         frame_count += 1
 
         key = int(cv2.waitKey(1) & 0xFF)
