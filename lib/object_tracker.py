@@ -103,19 +103,19 @@ def _max_rating_detection(detections: List[Detection]) -> Detection:
 def track(cam: cv2.VideoCapture, 
             replace_bg_color: Tuple[int] = None,
             frame_callback: Callable[[TrackObject], bool] = None):
-
-    """ Detect objects on video stream.
+    """ Detect and tract an object in video stream.
 
     This function continously monitors given video stream and detects objects coming in to the vision field. 
-    It tracks an object detected while it is moving across the field and detects when it stops.
+    It tracks an object detected while it is moving across the vision field and detects when it stops.
+
     The function yields every frame taken from the device along with detected object's bounding box 
     and state (new -> moved -> stopped). Only one object at a time could be tracked.
     
     Arguments:
         cam:    frame source (camera or video)
-        replace_bg_color: if not `None`, background of an object detected will be erased 
-            and replaced with given color
-        frame_callback: a callback function, which receives a track detection object and
+        replace_bg_color: if not `None`, object background (everything except object itself) 
+            will be erased and replaced with given color
+        frame_callback: a callback function, which receives a `TrackObject` instance and
             should return either `True` to continue tracking or `False` to immediatelly
             stop the loop and exit
 
@@ -191,29 +191,29 @@ def track_detect(
     track_time: float = 2.0,
     replace_bg_color: Tuple[int] = None,
     use_rating: bool = True,
-    save_roi: bool = False,
     frame_callback: Callable[[TrackObject], bool] = None):
 
-    """ Tracks and classifies objects on a video stream.
+    """ Detects and classifies objects in a video stream.
 
     This function continously monitors given frame source, detects objects coming in to the vision field
     and classifies them using given callback function. 
 
     When a new object is detected, the function collects ROIs of that object for some time. 
-    After the time elapses, it chooses the best classification match and stops the detection loop until new object appears.
+    After the time elapses, it chooses the best classification match and stops the detection loop 
+    until new object appears.
 
     The function yields every frame along with detection results. Only one object at a time could be tracked.
 
     Arguments:
         cam:    frame source (camera or video)
-        detect_callback:    A callback which must accept a ROI of object detected and return
+        detect_callback:    A callback which must accept a ROI of an object detected and return
             a list contaiting `(label, probability)` tuples sorted descending on probability.
-            Only 1st element of that iterable is used currently.
+            Only 1st element of that iterable is currently used.
         track_time:     time limit to perform initial frame collection (in seconds)
         replace_bg_color: if not `None`, background of an ROI will be erased and replaced with given color
+            before passing it to the callback
         use_rating: if `True` (default), uses rating mechanism to determine best detection from collected list.
             Otherwise, selects detection with highest probability.
-        save_roi: if `True`, saves detected ROI images to out/roi directory
         frame_callback: a callback function, which receives a track detection object and
             should return either `True` to continue tracking or `False` to immediatelly
             stop the loop and exit
@@ -227,12 +227,8 @@ def track_detect(
     detect_start_time = 0.0
     detection: Detection = None
     frame_count = 0
-    image_count = 0
-    run_time = datetime.now().strftime('%y%m%d%H%M%S')
 
-    for tro in track(
-        cam, 
-        frame_callback=frame_callback):
+    for tro in track(cam, frame_callback=frame_callback):
         frame_count += 1
         detection = Detection(tro.frame, tro.bbox)
         
@@ -264,7 +260,6 @@ def track_detect(
                         _logger.debug('Got no detections')
                     else:
                         _logger.debug(f'Top-3 detections: {labels_probs[:3]}')
-
                         roi_label, roi_prob = labels_probs[0]
                         if roi_prob >= 0.3:
                             detections.append(Detection(tro.frame, tro.bbox, roi, roi_label, roi_prob))
@@ -273,14 +268,6 @@ def track_detect(
                     # Time's out, find best prediction and pass it to the caller
                     detection = _max_rating_detection(detections) if use_rating else _max_prob_detection(detections)
                     _logger.debug(f'Detection loop finished, {detection.label} label selected')
-                    if save_roi:
-                        # Save all detected ROIs to out\roi\{run_id} under one label
-                        roi_dir = os.path.join(OUTPUT_DIR, 'roi', run_time)
-                        os.makedirs(roi_dir, exist_ok=True)
-                        for d in detections:
-                            cv2.imwrite(os.path.join(roi_dir, f'{detection.label}_{image_count:04d}.png'), d.roi)
-                            image_count += 1
-
                     detections = []
 
         yield detection

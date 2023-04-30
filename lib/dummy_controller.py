@@ -56,3 +56,5 @@ class DummyController:
     def disconnect(self):
         _logger.info('Controller disconnected')
 
+    def get_next_message(self):
+        return None

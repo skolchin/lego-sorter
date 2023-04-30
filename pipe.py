@@ -82,12 +82,17 @@ def main(_):
         status_info.append('Starting video output to %s', fn)
         video_out = cv2.VideoWriter(fn, cv2.VideoWriter_fourcc(*'mp4v'), 30.0, tuple(reversed(FRAME_SIZE)))
 
+    def detect_callback(roi: np.ndarray):
+        labels, probs = predict_image_probs(model, roi, class_names)
+        if FLAGS.save_roi:
+            save_roi(roi, labels[0], probs[0])
+        return labels, probs
+
     for detection in track_detect(
         cam, 
-        lambda roi: predict_image_probs(model, roi, class_names), 
+        detect_callback=detect_callback,
         track_time=3.0,
-        replace_bg_color=(255,255,255),
-        save_roi=FLAGS.save_roi):
+        replace_bg_color=(255,255,255)):
 
         if detection.label and detection.label != roi_label:
             roi_label = detection.label

@@ -7,9 +7,9 @@ import cv2
 import numpy as np
 import img_utils22 as imu
 import logging
-from typing import Iterable, Tuple
+from typing import Iterable, Tuple, Mapping
 
-from .globals import IMAGE_DIR
+from .globals import IMAGE_DIR, OUTPUT_DIR
 from .status_info import StatusInfo
 
 logger = logging.getLogger('lego-tracker')
@@ -25,6 +25,8 @@ REF_WINDOW_SIZE = (240, 320)
 REF_WINDOW_TITLE = 'Ref'
 
 def show_welcome_screen():
+    """ Shows some nice-looking window while all necessary stuff is been loaded """
+    
     frame = np.full(list(FRAME_SIZE) + [3], imu.COLOR_BLACK, np.uint8)
     x,y = int(FRAME_SIZE[1]/2) - 50, int(FRAME_SIZE[0]/2) - 20
     cv2.putText(frame, 'Loading...', (x,y), cv2.FONT_HERSHEY_SIMPLEX, .8, color=imu.COLOR_GREEN)
@@ -33,7 +35,7 @@ def show_welcome_screen():
 def show_frame(frame: np.ndarray):
     cv2.imshow(FRAME_WINDOW_TITLE, frame)
 
-def hide_stream():
+def hide_frame():
     cv2.destroyWindow(FRAME_WINDOW_TITLE)
 
 def show_roi_window(img: np.ndarray, caption: str, contour: Iterable = None, wsize: Tuple[int] = ROI_WINDOW_SIZE):
@@ -79,6 +81,8 @@ def hide_hist_window():
         pass
 
 def show_ref_window(ref: np.ndarray, caption: str, wsize: Tuple[int] = REF_WINDOW_SIZE):
+    """ Shows reference image window """
+
     if ref is None:
         hide_ref_window()
     else:
@@ -86,23 +90,29 @@ def show_ref_window(ref: np.ndarray, caption: str, wsize: Tuple[int] = REF_WINDO
         cv2.imshow(REF_WINDOW_TITLE, ref)
 
 def hide_ref_window():
+    """ Hides reference image window """
+
     try:
         cv2.destroyWindow(REF_WINDOW_TITLE)
     except:
         pass
 
 def color_rect(frame: np.ndarray, bbox: Tuple[int], color: Tuple[int]):
+    """ Draws rectange of given color """
     x, y = bbox[0], bbox[1]
     cx, cy = bbox[0] + bbox[2], bbox[1] + bbox[3]
     cv2.rectangle(frame, (x,y), (cx, cy), color, 1)
 
 def green_rect(frame: np.ndarray, bbox: Tuple[int]):
+    """ Draws green rectange """
     color_rect(frame, bbox, imu.COLOR_GREEN)
 
 def red_rect(frame: np.ndarray, bbox: Tuple[int]):
+    """ Draws red rectange """
     color_rect(frame, bbox, imu.COLOR_RED)
 
 def color_named_rect(frame: np.ndarray, bbox: Tuple[int], caption: str, color: Tuple[int]) -> np.ndarray:
+    """ Draws rectange of given color with caption """
     x, y = bbox[0], bbox[1]
     cx, cy = bbox[0] + bbox[2], bbox[1] + bbox[3]
     tx, ty = x, y - 8
@@ -114,12 +124,17 @@ def color_named_rect(frame: np.ndarray, bbox: Tuple[int], caption: str, color: T
     return frame
 
 def green_named_rect(frame: np.ndarray, bbox: Tuple[int], caption: str) -> np.ndarray:
+    """ Draws green rectange with caption """
     color_named_rect(frame, bbox, caption, imu.COLOR_GREEN)
 
 def red_named_rect(frame: np.ndarray, bbox: Tuple[int], caption: str) -> np.ndarray:
+    """ Draws red rectange with caption """
     color_named_rect(frame, bbox, caption, imu.COLOR_RED)
 
 def bgmask_to_bbox_contour(bg_mask: np.ndarray) -> Tuple[Tuple[int], Iterable]:
+    """ Transform a complext background mask into pair of 
+    (left, top, width, height) bounding box and a contour suitable to draw objects' siluette """
+
     kernel = imu.misc.get_kernel(10)
     bg_mask = cv2.morphologyEx(bg_mask, cv2.MORPH_OPEN, kernel)
     bg_mask = cv2.morphologyEx(bg_mask, cv2.MORPH_CLOSE, kernel)
@@ -135,6 +150,7 @@ def bgmask_to_bbox_contour(bg_mask: np.ndarray) -> Tuple[Tuple[int], Iterable]:
     return bbox, contour
 
 def bgmask_to_bbox(bg_mask: np.ndarray) -> Tuple[int]:
+    """ Transform a complext background mask into (left, top, width, height) bounding box """
     return bgmask_to_bbox_contour(bg_mask)[0]
 
 def extract_roi(
@@ -142,7 +158,8 @@ def extract_roi(
     bbox: Tuple[int], 
     bbox_relax: float = 0.2, 
     zoom: float = 0.0) -> np.ndarray:
-    """ Extracts an ROI (region of interest) with specified bounding box optionally zooming it out by given factor
+    """ Extracts an ROI (region of interest) with specified bounding box 
+    optionally zooming it out by given factor
     """
 
     dw, dh = int(bbox[2]*bbox_relax), int(bbox[3]*bbox_relax)
@@ -158,7 +175,21 @@ def extract_roi(
         roi = zoom_image(roi, zoom, 255)
     return roi
 
+_save_count: int = 1
+
+def save_roi(roi: np.ndarray, label: str, prob: float):
+    """ Save an ROI picture under detected label to out\roi directory
+    """
+    global _save_count
+
+    roi_dir = os.path.join(OUTPUT_DIR, 'roi', label)
+    os.makedirs(roi_dir, exist_ok=True)
+    cv2.imwrite(os.path.join(roi_dir, f'{label}_{_save_count:04d}.png'), roi)
+    _save_count += 1
+
 def plot_hist(img_list: list, wsize: Tuple[int], log_scale: bool = False) -> np.ndarray:
+    """ Draw a color separation histogram chart and save it as a picture """
+
     from matplotlib.backends.backend_agg import FigureCanvasAgg
     from matplotlib.figure import Figure
     from matplotlib.cm import get_cmap
@@ -182,6 +213,9 @@ def plot_hist(img_list: list, wsize: Tuple[int], log_scale: bool = False) -> np.
     return imu.resize(buf, wsize)
 
 def preprocess_image(frame: np.ndarray) -> np.ndarray:
+    """ Wrapper around image dataset `_preprocess` function which keeps 
+    picture in OpenCV (numpy) format
+    """
     from .image_dataset import _preprocess
     
     if frame is None:
@@ -190,7 +224,9 @@ def preprocess_image(frame: np.ndarray) -> np.ndarray:
     if hasattr(frame, 'numpy'): frame = frame.numpy()
     return frame.astype('uint8')
 
-def get_ref_images(class_names) -> Iterable:
+def get_ref_images(class_names: Iterable[str]) -> Mapping[str, np.ndarray]:
+    """ Loads reference images for given class set """
+
     ref_images = {}
     for label in class_names:
         fn = os.path.join(IMAGE_DIR, f'{label}.png')
@@ -202,5 +238,6 @@ def get_ref_images(class_names) -> Iterable:
                 logger.error(f'Cannot find file {fn}')
         except FileNotFoundError:
             logger.error(f'Cannot find file {fn}')
+
     return ref_images
 
