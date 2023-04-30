@@ -83,10 +83,10 @@ def main(_):
         video_out = cv2.VideoWriter(fn, cv2.VideoWriter_fourcc(*'mp4v'), 30.0, tuple(reversed(FRAME_SIZE)))
 
     def detect_callback(roi: np.ndarray):
-        labels, probs = predict_image_probs(model, roi, class_names)
+        probs = predict_image_probs(model, roi, class_names)
         if FLAGS.save_roi:
-            save_roi(roi, labels[0], probs[0])
-        return labels, probs
+            save_roi(roi, probs[0][0], probs[0][1])
+        return probs
 
     for detection in track_detect(
         cam, 
