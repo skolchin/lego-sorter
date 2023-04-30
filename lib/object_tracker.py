@@ -14,8 +14,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, List, Callable, Tuple
 
-from .globals import OUTPUT_DIR
-from .pipe_utils import bgmask_to_bbox, extract_roi
+from .pipe_utils import bgmask_to_bbox, extract_roi, FPS_RATE
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('var_threshold', 40, help='Background detection threshold')
@@ -134,12 +133,17 @@ def track(cam: cv2.VideoCapture,
     obj_tracker = None
     obj_bbox = None
     obj_state: ObjectState = ObjectState.NONE
+    frame_count = 0
 
     while True:
         ret, frame = cam.read()
         if not ret:
             _logger.info('No more frames, exiting')
             break
+
+        frame_count += 1
+        if frame_count < FPS_RATE:
+            continue
 
         # Make a static background subtractor
         if back_sub is None:
