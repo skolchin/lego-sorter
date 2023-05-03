@@ -25,7 +25,7 @@ REF_WINDOW_SIZE = (240, 320)
 REF_WINDOW_TITLE = 'Ref'
 
 def show_welcome_screen():
-    """ Shows some nice-looking window while all necessary stuff is been loaded """
+    """ Shows splash screen while all necessary stuff is been loaded """
     
     frame = np.full(list(FRAME_SIZE) + [3], imu.COLOR_BLACK, np.uint8)
     x,y = int(FRAME_SIZE[1]/2) - 50, int(FRAME_SIZE[0]/2) - 20
@@ -33,12 +33,15 @@ def show_welcome_screen():
     cv2.imshow(FRAME_WINDOW_TITLE, frame)
 
 def show_frame(frame: np.ndarray):
+    """ Shows a frame from video source in a main window """
     cv2.imshow(FRAME_WINDOW_TITLE, frame)
 
 def hide_frame():
+    """ Hides main window """
     cv2.destroyWindow(FRAME_WINDOW_TITLE)
 
 def show_roi_window(img: np.ndarray, caption: str, contour: Iterable = None, wsize: Tuple[int] = ROI_WINDOW_SIZE):
+    """ Shows ROI window """
     if img is None:
         canvas = np.full(list(wsize) + [3], imu.COLOR_GRAY, np.uint8)
     else:
@@ -59,6 +62,7 @@ def show_roi_window(img: np.ndarray, caption: str, contour: Iterable = None, wsi
     cv2.imshow(ROI_WINDOW_TITLE, canvas)
 
 def hide_roi_window():
+    """ Hides ROI window """
     try:
         cv2.destroyWindow(ROI_WINDOW_TITLE)
     except:
@@ -187,8 +191,8 @@ def save_roi(roi: np.ndarray, label: str, prob: float):
     cv2.imwrite(os.path.join(roi_dir, f'{label}_{_save_count:04d}.png'), roi)
     _save_count += 1
 
-def plot_hist(img_list: list, wsize: Tuple[int], log_scale: bool = False) -> np.ndarray:
-    """ Draw a color separation histogram chart and save it as a picture """
+def plot_hist(img_list: Iterable[np.ndarray], wsize: Tuple[int], log_scale: bool = False) -> np.ndarray:
+    """ Draw a color separation histogram chart for given images and save it as a picture """
 
     from matplotlib.backends.backend_agg import FigureCanvasAgg
     from matplotlib.figure import Figure
@@ -213,9 +217,7 @@ def plot_hist(img_list: list, wsize: Tuple[int], log_scale: bool = False) -> np.
     return imu.resize(buf, wsize)
 
 def preprocess_image(frame: np.ndarray) -> np.ndarray:
-    """ Wrapper around image dataset `_preprocess` function which keeps 
-    picture in OpenCV (numpy) format
-    """
+    """ Wrapper around image dataset `_preprocess` function to keep the picture in OpenCV format """
     from .image_dataset import _preprocess
     
     if frame is None:
