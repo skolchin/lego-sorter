@@ -8,6 +8,8 @@ import img_utils22 as imu
 import tensorflow as tf
 from typing import Iterable, Tuple
 
+import root_dir
+
 def draw_ruler(img, caption, x=50, y=80):
     w = img.shape[1]-2*x
     cv2.putText(img, caption, (x,y-10), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.6, imu.COLOR_BLACK)
@@ -40,16 +42,18 @@ def zoom_tf(img, zoom):
     layer = tf.keras.layers.RandomZoom(r, r, fill_mode='nearest', interpolation='nearest')
     return layer(img).numpy()
 
+def zoom_img(img, zoom):
+    from lib.image_dataset import zoom_image
+    img = zoom_image(img, zoom, 255)
+    return img if isinstance(img, np.ndarray) else img.numpy()
+
 def main():
     canvas = np.full((480, 640, 3), imu.COLOR_WHITE, np.uint8)
     draw_ruler(canvas, 'original', y=200)
     imu.imshow(canvas, 'canvas')
 
-    # zoomed = zoom_scale(canvas, 0.5)
-    # imu.imshow(zoomed, f'zoom: {0.5}')
-
     for n, zoom in enumerate([0.3, 0.5, 1.3, 1.5]):
-        zoomed = zoom_tf(canvas, zoom)
+        zoomed = zoom_img(canvas, zoom)
         draw_ruler(zoomed, f'zoom: {zoom}', y=200+n*40)
         imu.imshow(zoomed, f'zoom: {zoom}')
 

@@ -18,10 +18,13 @@ from lib.globals import IMAGE_DIR, BATCH_SIZE, IMAGE_SIZE
 from lib.model import preprocess_input
 
 FLAGS = flags.FLAGS
-flags.DEFINE_float('zoom_factor', 0.3, help='Maximum zoom level for image augmentation')
+flags.DEFINE_float('zoom_factor', 0.3, help='Maximum zoom level for image augmentation (for --zoom model only)')
 flags.DEFINE_float('brightness_factor', 0.3, help='Maximum brightness level for image augmentation')
 flags.DEFINE_float('rotation_factor', 0.45, help='Maximum rotation in image augmentation')
-flags.DEFINE_float('edge_emboss', 0.5, lower_bound=0.0, help='Edge embossing factor')
+flags.DEFINE_float('crop_factor', 0.0, upper_bound=1.0, help='Crop image factor (from center)')
+flags.DEFINE_float('edge_emboss', 0.5, lower_bound=0.0, help='Edge embossing factor (for --emboss model only)')
+flags.DEFINE_float('shuffle_buffer_size', 0.25, 
+                   help='Shuffle buffer, either ratio to number of files (<1) or actual size')
 
 tf.get_logger().setLevel('ERROR')
 
@@ -67,6 +70,10 @@ def _wireframe(images):
 
 def _preprocess(images, labels=None, seed=None):
     """ Image preprocessing function """
+    if FLAGS.crop_factor:
+        images = tf.image.central_crop(images, FLAGS.crop_factor)
+        images = tf.image.resize(images, IMAGE_SIZE, 'bicubic', preserve_aspect_ratio=False)
+
     images = preprocess_input(images)
 
     if FLAGS.emboss:
@@ -125,13 +132,16 @@ def load_dataset() -> ImageDataset:
         color_mode='rgb',
         batch_size=None,
         image_size=IMAGE_SIZE,
+        interpolation='bicubic',
         shuffle=False,
         crop_to_aspect_ratio=True,
         seed=seed,
     )
     num_files = len(ds.file_paths)
+    buf_size = int(FLAGS.shuffle_buffer_size * num_files) if FLAGS.shuffle_buffer_size < 1 \
+        else int(FLAGS.shuffle_buffer_size)
     return ImageDataset(
-        ds.shuffle(buffer_size=int(num_files/4), reshuffle_each_iteration=False, seed=seed) \
+        ds.shuffle(buffer_size=buf_size, reshuffle_each_iteration=False, seed=seed) \
             .map(partial(_preprocess, seed=seed)) \
             .batch(BATCH_SIZE) \
             .prefetch(tf.data.AUTOTUNE), 
@@ -147,6 +157,7 @@ def split_dataset(ids: ImageDataset, split_by: float=0.8) -> Tuple[tf.data.Datas
     return (train_ds, test_ds)
 
 def augment_dataset(tfds: tf.data.Dataset) -> tf.data.Dataset:
+    """ Applies multiple augmentatiions to the TF dataset """
     counter = tf.data.experimental.Counter()
     tfds_with_seed = tf.data.Dataset.zip((tfds, (counter, counter)))
     augmented_dataset = tfds_with_seed.map(_augment_images)
@@ -274,19 +285,22 @@ def _pad_to_bounding_box_color(image, offset_height, offset_width,
     return padded
 
 def zoom_image(image, zoom: float, pad_color: int = 0):
-    """ Image zoom implementation with tensorflow functions.
-
-    Currently only zooms image out and its countered to normal meaning: 
-    `zoom > 1.0` means object is zoomed _out_ (become smaller) at given proportion.
-
-    Will work this out later.
-    """
+    """ Image zoom implementation with tensorflow functions """
+    if zoom <= 0.0:
+        raise ValueError(f'Zoom must be greater than zero')
+    
     if zoom == 1.0:
+        # No zoom
         return image
 
     is_tensor = isinstance(image, tf.Tensor)
     shape = np.array(image).shape if not is_tensor else image.get_shape().as_list()
     image_size = np.array(shape[:2])
+    if zoom < 1.0:
+        # Zoom in - this is basically central crop with original size restored
+        image = tf.image.central_crop(image, 1.0-zoom)
+        return tf.image.resize(image, image_size, 'bicubic', preserve_aspect_ratio=False)
+
     zoom_size = (image_size * zoom).astype('int')
     offset_height, offset_width = max((zoom_size[0]-image_size[0]) // 2,0), max((zoom_size[1]-image_size[1]) // 2,0)
     target_height, target_width = zoom_size[0], zoom_size[1]
