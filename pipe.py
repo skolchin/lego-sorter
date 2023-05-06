@@ -32,7 +32,7 @@ flags.DEFINE_boolean('save_video', False, help='Start with video capture')
 flags.DEFINE_boolean('save_roi', False, help='Save detected ROI images to out/roi directory')
 flags.DEFINE_float('valid_confidence', 0.3, help='Confidence level to consider detection valid')
 
-HELP_INFO = 'Press ESC or Q to quit, S for camera settings, C for video capture'
+HELP_INFO = 'Press ESC or Q to quit, S for camera settings, C for video capture, D for debug info'
 
 def main(_):
     """ Video recognition pipeline """
@@ -45,6 +45,7 @@ def main(_):
     model = make_model(len(class_names))
     load_model(model)
 
+    # This one is to warm up a model
     frame = np.full(list(FRAME_SIZE) + [3], imu.COLOR_BLACK, np.uint8)
     predict_image(model, frame, class_names)
 
@@ -62,6 +63,13 @@ def main(_):
         cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('M','J','P','G'))
         cam.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_SIZE[1])
         cam.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_SIZE[0])
+
+        # Read 1 sec of cam video to let it initialize
+        for _ in range(FPS_RATE):
+            ret, _ = cam.read()
+            if not ret:
+                logger.error('Cannot read from camera, quitting')
+                return
 
     ref_images = get_ref_images(class_names)
 
@@ -100,6 +108,7 @@ def main(_):
         replace_bg_color=(255,255,255)):
 
         if detection.label and detection.label != roi_label:
+            # Detected piece has changed
             roi_label = detection.label
             roi = detection.roi
             ref = ref_images.get(detection.label)
