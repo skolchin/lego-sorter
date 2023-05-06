@@ -2,11 +2,18 @@
 # Zoom test
 # (c) lego-sorter team, 2022-2023
 
+import os
 import cv2
 import numpy as np
 import img_utils22 as imu
 import tensorflow as tf
+import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider
+from absl import app, flags
+from root_dir import ROOT_DIR
 from typing import Iterable, Tuple
+
+from lib.image_dataset import IMAGE_DIR, IMAGE_SIZE
 
 def draw_ruler(img, caption, x=50, y=80):
     w = img.shape[1]-2*x
@@ -40,7 +47,16 @@ def zoom_tf(img, zoom):
     layer = tf.keras.layers.RandomZoom(r, r, fill_mode='nearest', interpolation='nearest')
     return layer(img).numpy()
 
-def main():
+def main(_):
+    image = tf.image.decode_image(tf.io.read_file(
+        os.path.join(IMAGE_DIR,'3001.png')), channels=3)
+    resized_image = tf.keras.preprocessing.image.smart_resize(image, IMAGE_SIZE)
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    plt.title('roi')
+    plt.axis('off')
+
+
     canvas = np.full((480, 640, 3), imu.COLOR_WHITE, np.uint8)
     draw_ruler(canvas, 'original', y=200)
     imu.imshow(canvas, 'canvas')
