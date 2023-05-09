@@ -113,7 +113,7 @@ def main(_):
             roi = detection.roi
             ref = ref_images.get(detection.label)
             roi_caption = f'{detection.label} ({detection.prob:.2%})'
-            status_info.append(f'Detection: {roi_caption}')
+            status_info.append(f'Detection: {roi_caption}', important=True)
             if show_preprocessed:
                 roi = preprocess_image(roi)
                 ref = preprocess_image(ref)

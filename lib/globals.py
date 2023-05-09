@@ -17,7 +17,7 @@ flags.DEFINE_boolean('zoom', False, short_name='z',
 ROOT_DIR = os.path.abspath(os.path.join(os.path.split(__file__)[0], '..'))
 """ Root dir """
 
-IMAGE_DIR = os.path.join(ROOT_DIR, 'images.224')
+IMAGE_DIR = os.path.join(ROOT_DIR, 'images.224.10.c')
 """ Images root """
 
 CHECKPOINT_DIR = os.path.join(ROOT_DIR, 'checkpoints')
