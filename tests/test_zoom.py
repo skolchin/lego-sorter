@@ -2,7 +2,6 @@
 # Zoom test
 # (c) lego-sorter team, 2022-2023
 
-import os
 import cv2
 import numpy as np
 import img_utils22 as imu
@@ -28,14 +27,6 @@ def zoom_at(img, zoom, pad_color=imu.COLOR_BLACK):
     return cv2.warpAffine(img, rot_mat, img.shape[1::-1], flags=cv2.INTER_NEAREST, 
         borderMode=cv2.BORDER_CONSTANT, borderValue=pad_color)
 
-def zoom_scale(img, zoom):
-    img = imu.rescale(img, scale=zoom, center=True, pad_color=imu.COLOR_WHITE)
-    # size = img.shape[:2]
-    # new_size = (int(img.shape[1] * zoom), int(img.shape[0] * zoom))
-    # img, _ = center_image(img, new_size)
-    # img = imu.resize(img, new_size=size)
-    return img
-
 def zoom_tf(img, zoom, pad_color=imu.COLOR_BLACK):
     from lib.image_dataset import zoom_image
     return zoom_image(img, zoom, pad_color[0])
@@ -47,13 +38,8 @@ def main(_):
     fig, ax = plt.subplots(figsize=(8, 4))
     plt.title('zoom')
     plt.axis('off')
-    fig.tight_layout()
 
-    zoom = 1.0
-    def apply_zoom(val):
-        nonlocal zoom
-        zoom = val
-
+    def apply_zoom(zoom):
         zoomed = np.full((200, 640, 3), imu.COLOR_WHITE, np.uint8)
         draw_ruler(zoomed)
         zoomed = zoom_at(zoomed, zoom, imu.COLOR_WHITE)
@@ -68,11 +54,11 @@ def main(_):
         valmin=0.1,
         valmax=3.0,
         valstep=0.1,
-        valinit=zoom,
-        orientation="vertical"
+        valinit=1.0,
+        orientation='vertical'
     )
     slider.on_changed(apply_zoom)
-    apply_zoom(zoom)
+    apply_zoom(1.0)
     plt.show()
 
 if __name__ == '__main__':
