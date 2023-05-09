@@ -57,7 +57,8 @@ def main(argv):
     model = make_model(num_labels)
     print('\nModel summary:\n---')
     model.summary()
-    load_model(model)
+    if FLAGS.save:
+        load_model(model)
 
     if not FLAGS.save:
         callbacks_list = [get_early_stopping_callback()]
@@ -82,4 +83,7 @@ def main(argv):
     # print('\n'.join([f'{m}={v:.4%}' for m, v in zip(model.metrics_names, metrics)]))
 
 if __name__ == '__main__':
-    app.run(main)
+    try:
+        app.run(main)
+    except (SystemExit, KeyboardInterrupt):
+        pass

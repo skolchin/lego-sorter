@@ -30,6 +30,7 @@ flags.DEFINE_string('file', None, short_name='f', help='Process video from given
 flags.DEFINE_boolean('debug', False, help='Start with debug info')
 flags.DEFINE_boolean('save_video', False, help='Start with video capture')
 flags.DEFINE_boolean('save_roi', False, help='Save detected ROI images to out/roi directory')
+flags.DEFINE_float('valid_confidence', 0.3, help='Confidence level to consider detection valid')
 
 HELP_INFO = 'Press ESC or Q to quit, S for camera settings, C for video capture, D for debug info'
 
@@ -91,15 +92,19 @@ def main(_):
         video_out = cv2.VideoWriter(fn, cv2.VideoWriter_fourcc(*'mp4v'), 30.0, tuple(reversed(FRAME_SIZE)))
 
     def detect_callback(roi: np.ndarray):
-        preds = predict_image_probs(model, roi, class_names)
+        roi_rgb = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
+        preds = predict_image_probs(model, roi_rgb, class_names)
+        label, prob = preds[0]
+        if prob < FLAGS.valid_confidence:
+            return None
         if FLAGS.save_roi:
-            save_roi(roi, preds[0][0], preds[0][1])
+            save_roi(roi, label, prob)
         return preds
 
     for detection in track_detect(
         cam, 
         detect_callback=detect_callback,
-        track_time=3.0,
+        track_time=2.0,
         replace_bg_color=(255,255,255)):
 
         if detection.label and detection.label != roi_label:

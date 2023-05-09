@@ -6,18 +6,14 @@ import os
 import cv2
 import numpy as np
 import img_utils22 as imu
-import tensorflow as tf
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
-from absl import app, flags
+from absl import app
 from root_dir import ROOT_DIR
-from typing import Iterable, Tuple
 
-from lib.image_dataset import IMAGE_DIR, IMAGE_SIZE
-
-def draw_ruler(img, caption, x=50, y=80):
+def draw_ruler(img, x=50, y=-1):
     w = img.shape[1]-2*x
-    cv2.putText(img, caption, (x,y-10), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.6, imu.COLOR_BLACK)
+    y = y if y >=0 else img.shape[0] // 2
     cv2.line(img, (x,y), (w+x, y), imu.COLOR_BLACK, 2)
     for n in np.linspace(0, 100, 11):
         cv2.line(img, (x,y-5), (x, y+5), imu.COLOR_BLACK, 1)
@@ -25,14 +21,12 @@ def draw_ruler(img, caption, x=50, y=80):
         x += int(w/10)
 
 # https://stackoverflow.com/questions/69050464/zoom-into-image-with-opencv
-def zoom_at(img, zoom, angle=0, coord=None):
-    cy, cx = [ i/2 for i in img.shape[:-1] ] if coord is None else coord[::-1]
-    
-    rot_mat = cv2.getRotationMatrix2D((cx,cy), angle, zoom)
-    result = cv2.warpAffine(img, rot_mat, img.shape[1::-1], flags=cv2.INTER_NEAREST, 
-        borderMode=cv2.BORDER_CONSTANT, borderValue=imu.COLOR_WHITE)
-    
-    return result
+def zoom_at(img, zoom, pad_color=imu.COLOR_BLACK):
+    cy, cx = [ i //2 for i in img.shape[:-1] ]
+
+    rot_mat = cv2.getRotationMatrix2D((cx,cy), 0, zoom)
+    return cv2.warpAffine(img, rot_mat, img.shape[1::-1], flags=cv2.INTER_NEAREST, 
+        borderMode=cv2.BORDER_CONSTANT, borderValue=pad_color)
 
 def zoom_scale(img, zoom):
     img = imu.rescale(img, scale=zoom, center=True, pad_color=imu.COLOR_WHITE)
@@ -42,32 +36,44 @@ def zoom_scale(img, zoom):
     # img = imu.resize(img, new_size=size)
     return img
 
-def zoom_tf(img, zoom):
-    r = (0-zoom, 0-zoom) if zoom < 1 else (zoom-1, zoom-1)
-    layer = tf.keras.layers.RandomZoom(r, r, fill_mode='nearest', interpolation='nearest')
-    return layer(img).numpy()
+def zoom_tf(img, zoom, pad_color=imu.COLOR_BLACK):
+    from lib.image_dataset import zoom_image
+    return zoom_image(img, zoom, pad_color[0])
 
 def main(_):
-    image = tf.image.decode_image(tf.io.read_file(
-        os.path.join(IMAGE_DIR,'3001.png')), channels=3)
-    resized_image = tf.keras.preprocessing.image.smart_resize(image, IMAGE_SIZE)
+    original = np.full((200, 640, 3), imu.COLOR_WHITE, np.uint8)
+    draw_ruler(original)
 
     fig, ax = plt.subplots(figsize=(8, 4))
-    plt.title('roi')
+    plt.title('zoom')
     plt.axis('off')
+    fig.tight_layout()
 
+    zoom = 1.0
+    def apply_zoom(val):
+        nonlocal zoom
+        zoom = val
 
-    canvas = np.full((480, 640, 3), imu.COLOR_WHITE, np.uint8)
-    draw_ruler(canvas, 'original', y=200)
-    imu.imshow(canvas, 'canvas')
+        zoomed = np.full((200, 640, 3), imu.COLOR_WHITE, np.uint8)
+        draw_ruler(zoomed)
+        zoomed = zoom_at(zoomed, zoom, imu.COLOR_WHITE)
+        merged = np.vstack((original, zoomed))
+        ax.imshow(merged)
+        ax.set_title(f'{zoom:.4f}')
+        fig.canvas.draw_idle()
 
-    # zoomed = zoom_scale(canvas, 0.5)
-    # imu.imshow(zoomed, f'zoom: {0.5}')
-
-    for n, zoom in enumerate([0.3, 0.5, 1.3, 1.5]):
-        zoomed = zoom_tf(canvas, zoom)
-        draw_ruler(zoomed, f'zoom: {zoom}', y=200+n*40)
-        imu.imshow(zoomed, f'zoom: {zoom}')
+    slider = Slider(
+        ax=fig.add_axes([0.1, 0.25, 0.0225, 0.63]),
+        label='zoom',
+        valmin=0.1,
+        valmax=3.0,
+        valstep=0.1,
+        valinit=zoom,
+        orientation="vertical"
+    )
+    slider.on_changed(apply_zoom)
+    apply_zoom(zoom)
+    plt.show()
 
 if __name__ == '__main__':
-    main()
+    app.run(main)

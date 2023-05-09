@@ -16,8 +16,6 @@ from .pipe_utils import bgmask_to_bbox, extract_roi
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('var_threshold', 40, help='Background detection threshold')
-flags.DEFINE_float('min_confidence', 0.1, help='Minimum confidence level to process the detection')
-flags.DEFINE_float('valid_confidence', 0.3, help='Confidence level to consider detection valid')
 
 _logger = logging.getLogger('lego-tracker')
 
@@ -251,15 +249,13 @@ def track_detect(
                         frame[tro.bgmask!=255] = replace_bg_color
 
                     roi = extract_roi(frame, tro.bbox, zoom=FLAGS.zoom_factor)
-                    roi_rgb = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
-                    labels_probs = detect_callback(roi_rgb)
+                    labels_probs = detect_callback(roi)
                     if not labels_probs:
-                        _logger.debug('Got no detections')
+                        _logger.debug('Got no detections, ignoring object')
                     else:
                         _logger.debug(f'Top-3 detections: {labels_probs[:3]}')
                         roi_label, roi_prob = labels_probs[0]
-                        if roi_prob >= 0.3:
-                            detections.append(Detection(tro.frame, tro.bbox, roi, roi_label, roi_prob))
+                        detections.append(Detection(tro.frame, tro.bbox, roi, roi_label, roi_prob))
 
                 elif detections:
                     # Time's out, find best prediction and pass it to the caller
