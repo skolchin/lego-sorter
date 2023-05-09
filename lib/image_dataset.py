@@ -308,8 +308,13 @@ def zoom_image(image: Union[np.ndarray, tf.Tensor], zoom: float,
         return image
 
     is_tensor = isinstance(image, tf.Tensor)
-    shape = image.shape if not is_tensor else image.get_shape()
-    image_size = np.array(shape[:2])
+    if not is_tensor:
+        shape = image.shape
+        image_size = np.array(shape[:2])
+    else:
+        shape = image.get_shape()
+        image_size = np.array(shape[:2]) if shape.ndims < 4 else np.array(shape[1:3])
+
     if zoom < 1.0:
         # Zoom in (result is larger)
         crop_image = tf.image.central_crop(image, zoom)
