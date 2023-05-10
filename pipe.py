@@ -8,9 +8,6 @@ import logging
 from absl import app, flags
 from datetime import datetime
 
-logging.basicConfig(format='%(levelname)s: %(message)s')
-logger = logging.getLogger('lego-tracker')
-
 from lib.globals import OUTPUT_DIR
 from lib.pipe_utils import *
 from lib.status_info import StatusInfo
@@ -29,10 +26,10 @@ flags.DEFINE_integer('camera', 0, short_name='c', help='Camera ID (0,1,...)')
 flags.DEFINE_string('file', None, short_name='f', help='Process video from given file')
 flags.DEFINE_boolean('debug', False, help='Start with debug info')
 flags.DEFINE_boolean('save_video', False, help='Start with video capture')
-flags.DEFINE_boolean('save_roi', False, help='Save detected ROI images to out/roi directory')
+flags.DEFINE_boolean('save_roi', False, help='Save all detected ROI images to out/roi directory')
 flags.DEFINE_float('valid_confidence', 0.3, help='Confidence level to consider detection valid')
 
-HELP_INFO = 'Press ESC or Q to quit, S for camera settings, C for video capture, D for debug info'
+HELP_INFO = 'Press ESC or Q to quit, S for camera settings, C for video capture, W to reclassify'
 
 def main(_):
     """ Video recognition pipeline """
@@ -77,6 +74,7 @@ def main(_):
     roi = None
     ref = None
     roi_label = None
+    roi_prob = None
     video_out = None
     show_debug = FLAGS.debug
     show_preprocessed = False
@@ -98,7 +96,7 @@ def main(_):
         if prob < FLAGS.valid_confidence:
             return None
         if FLAGS.save_roi:
-            save_roi(roi, label, prob)
+            save_roi_out(roi, label, prob)
         return preds
 
     for detection in track_detect(
@@ -108,9 +106,9 @@ def main(_):
         replace_bg_color=(255,255,255)):
 
         if detection.label and detection.label != roi_label:
-            # Detected piece has changed
             roi_label = detection.label
             roi = detection.roi
+            roi_prob = detection.prob
             ref = ref_images.get(detection.label)
             roi_caption = f'{detection.label} ({detection.prob:.2%})'
             status_info.append(f'Detection: {roi_caption}')
@@ -176,9 +174,26 @@ def main(_):
                 if not FLAGS.file:
                     cam.set(cv2.CAP_PROP_SETTINGS, 1)
 
+            case 119:   # w
+                if roi is None or roi_label is None:
+                    status_info.append('Cannot start label selection, detect something first!', True)
+                else:
+                    status_info.append('Waiting for label selection', True)
+                    status_info.apply(frame)
+                    show_frame(frame)
+                    cv2.waitKey(10)
+
+                    new_label = choose_label(roi_label)
+                    if not new_label:
+                        status_info.append('No label selected')
+                    else:
+                        status_info.append(f'{new_label} label selected, saving for retrain')
+                        save_roi_retrain(roi, new_label, roi_prob, roi_label)
+
     if video_out is not None:
         video_out.release()
     cam.release()
 
 if __name__ == '__main__':
+    logging.basicConfig(format='%(levelname)s: %(message)s')
     app.run(main)

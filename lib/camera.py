@@ -1,5 +1,5 @@
 # LEGO sorter project
-# Video recognition pipeline demo
+# Camera object
 # (c) lego-sorter team, 2022-2023
 
 import cv2

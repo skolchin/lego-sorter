@@ -17,13 +17,16 @@ flags.DEFINE_boolean('zoom', False, short_name='z',
 ROOT_DIR = os.path.abspath(os.path.join(os.path.split(__file__)[0], '..'))
 """ Root dir """
 
-IMAGE_DIR = os.path.join(ROOT_DIR, 'images.224')
+IMAGE_DIR = os.path.join(ROOT_DIR, 'images')
 """ Images root """
 
 CHECKPOINT_DIR = os.path.join(ROOT_DIR, 'checkpoints')
 """ Checkpoints root """
 
 OUTPUT_DIR = os.path.join(ROOT_DIR, 'out')
+""" Output dir """
+
+RETRAIN_DIR = os.path.join(ROOT_DIR, 'retrain')
 """ Output dir """
 
 BATCH_SIZE = 32
