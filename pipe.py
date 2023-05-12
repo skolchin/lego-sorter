@@ -103,7 +103,7 @@ def main(_):
         cam, 
         detect_callback=detect_callback,
         track_time=2.0,
-        replace_bg_color=(255,255,255)):
+        replace_bg_color=BACK_COLOR):
 
         if detection.label and detection.label != roi_label:
             roi_label = detection.label

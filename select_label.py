@@ -15,7 +15,6 @@
 import os
 import json
 import tkinter as tk
-from tkinter import ttk
 from tkinter.simpledialog import Dialog
 from string import ascii_lowercase, digits
 from absl import app, flags
@@ -148,7 +147,6 @@ class SelectLabelDialog(Dialog):
 def main(_):
     root = tk.Tk('class_name')
     root.title('Label')
-    root.style = ttk.Style(root)
 
     # hide main window so only the dialog will be visible
     root.withdraw()

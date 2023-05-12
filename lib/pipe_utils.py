@@ -26,6 +26,7 @@ HIST_WINDOW_SIZE = (240, 320)
 HIST_WINDOW_TITLE = 'Histogram'
 REF_WINDOW_SIZE = (240, 320)
 REF_WINDOW_TITLE = 'Ref'
+BACK_COLOR = imu.COLOR_GRAY
 
 def show_welcome_screen():
     """ Shows splash screen while all necessary stuff is been loaded """
@@ -48,7 +49,7 @@ def show_roi_window(img: np.ndarray, caption: str, contour: Iterable = None, wsi
     if img is None:
         canvas = np.full(list(wsize) + [3], imu.COLOR_GRAY, np.uint8)
     else:
-        canvas = np.full(list(wsize) + [3], imu.COLOR_WHITE, np.uint8)
+        canvas = np.full(list(wsize) + [3], BACK_COLOR, np.uint8)
         if img.shape[0] > canvas.shape[0] or img.shape[1] > canvas.shape[1]:
             scale_y, scale_x = (canvas.shape[0]-20) / img.shape[0], (canvas.shape[1]-20) / img.shape[1]
             img = imu.resize(img, scale=min(scale_x, scale_y))
@@ -89,7 +90,6 @@ def hide_hist_window():
 
 def show_ref_window(ref: np.ndarray, caption: str, wsize: Tuple[int] = REF_WINDOW_SIZE):
     """ Shows reference image window """
-
     if ref is None:
         hide_ref_window()
     else:
@@ -98,7 +98,6 @@ def show_ref_window(ref: np.ndarray, caption: str, wsize: Tuple[int] = REF_WINDO
 
 def hide_ref_window():
     """ Hides reference image window """
-
     try:
         cv2.destroyWindow(REF_WINDOW_TITLE)
     except:
@@ -179,7 +178,7 @@ def extract_roi(
     roi = imu.get_image_area(frame, bbox)
     if zoom is not None and zoom > 0.0:
         from .image_dataset import zoom_image
-        roi = zoom_image(roi, zoom, 255)
+        roi = zoom_image(roi, zoom, BACK_COLOR[0])
     return roi
 
 _save_count: int = 1
