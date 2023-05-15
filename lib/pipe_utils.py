@@ -7,9 +7,12 @@ import cv2
 import numpy as np
 import img_utils22 as imu
 import logging
+import json
+from datetime import datetime
+from subprocess import check_output, CalledProcessError
 from typing import Iterable, Tuple, Mapping
 
-from .globals import IMAGE_DIR, OUTPUT_DIR
+from .globals import IMAGE_DIR, OUTPUT_DIR, RETRAIN_DIR
 from .status_info import StatusInfo
 
 logger = logging.getLogger('lego-tracker')
@@ -23,6 +26,7 @@ HIST_WINDOW_SIZE = (240, 320)
 HIST_WINDOW_TITLE = 'Histogram'
 REF_WINDOW_SIZE = (240, 320)
 REF_WINDOW_TITLE = 'Ref'
+BACK_COLOR = imu.COLOR_GRAY
 
 def show_welcome_screen():
     """ Shows splash screen while all necessary stuff is been loaded """
@@ -45,7 +49,7 @@ def show_roi_window(img: np.ndarray, caption: str, contour: Iterable = None, wsi
     if img is None:
         canvas = np.full(list(wsize) + [3], imu.COLOR_GRAY, np.uint8)
     else:
-        canvas = np.full(list(wsize) + [3], imu.COLOR_WHITE, np.uint8)
+        canvas = np.full(list(wsize) + [3], BACK_COLOR, np.uint8)
         if img.shape[0] > canvas.shape[0] or img.shape[1] > canvas.shape[1]:
             scale_y, scale_x = (canvas.shape[0]-20) / img.shape[0], (canvas.shape[1]-20) / img.shape[1]
             img = imu.resize(img, scale=min(scale_x, scale_y))
@@ -86,7 +90,6 @@ def hide_hist_window():
 
 def show_ref_window(ref: np.ndarray, caption: str, wsize: Tuple[int] = REF_WINDOW_SIZE):
     """ Shows reference image window """
-
     if ref is None:
         hide_ref_window()
     else:
@@ -95,7 +98,6 @@ def show_ref_window(ref: np.ndarray, caption: str, wsize: Tuple[int] = REF_WINDO
 
 def hide_ref_window():
     """ Hides reference image window """
-
     try:
         cv2.destroyWindow(REF_WINDOW_TITLE)
     except:
@@ -176,13 +178,13 @@ def extract_roi(
     roi = imu.get_image_area(frame, bbox)
     if zoom is not None and zoom > 0.0:
         from .image_dataset import zoom_image
-        roi = zoom_image(roi, zoom, 255)
+        roi = zoom_image(roi, zoom, BACK_COLOR[0])
     return roi
 
 _save_count: int = 1
 
-def save_roi(roi: np.ndarray, label: str, prob: float):
-    """ Save an ROI picture under detected label to out\roi directory
+def save_roi_out(roi: np.ndarray, label: str, prob: float):
+    """ Save an ROI picture under detected label to out\roi\ directory
     """
     global _save_count
 
@@ -190,6 +192,26 @@ def save_roi(roi: np.ndarray, label: str, prob: float):
     os.makedirs(roi_dir, exist_ok=True)
     cv2.imwrite(os.path.join(roi_dir, f'{label}_{_save_count:04d}.png'), roi)
     _save_count += 1
+
+def save_roi_retrain(roi: np.ndarray, label: str, prob: float, orig_label: str):
+    """ Save an ROI picture under detected label to retrain\ directory along with extra info
+    """
+    global _save_count
+
+    roi_dir = os.path.join(RETRAIN_DIR, label)
+    os.makedirs(roi_dir, exist_ok=True)
+    filename = os.path.join(roi_dir, f'{label}_{_save_count:04d}.png')
+    cv2.imwrite(filename, roi)
+    _save_count += 1
+
+    with open(os.path.join(RETRAIN_DIR, 'train.log'), 'at') as fp:
+        buf = json.dumps({
+            '_ts': datetime.now().isoformat(),
+            'label': label,
+            'prob': prob,
+            'orig_label': orig_label,
+            'image': filename})
+        fp.write(buf + '\n')
 
 def plot_hist(img_list: Iterable[np.ndarray], wsize: Tuple[int], log_scale: bool = False) -> np.ndarray:
     """ Draw a color separation histogram chart for given images and save it as a picture """
@@ -243,3 +265,18 @@ def get_ref_images(class_names: Iterable[str]) -> Mapping[str, np.ndarray]:
 
     return ref_images
 
+def choose_label(label: str) -> str:
+    """ Runs label selection script, returns new label or None """
+    try:
+        args = ['python', 'select_label.py']
+        if label:
+            args.extend(['--label', label])
+        out = check_output(args)
+        if not out:
+            return None
+        
+        result = json.loads(out)
+        return result.get('label')
+    except CalledProcessError as ex:
+        logger.exception('Error', ex)
+        return None

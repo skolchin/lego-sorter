@@ -18,13 +18,27 @@ from lib.globals import IMAGE_DIR, BATCH_SIZE, IMAGE_SIZE
 from lib.model import preprocess_input
 
 FLAGS = flags.FLAGS
-flags.DEFINE_float('zoom_factor', 0.3, help='Maximum zoom level for image augmentation (for --zoom model only)')
-flags.DEFINE_float('brightness_factor', 0.3, help='Maximum brightness level for image augmentation')
-flags.DEFINE_float('rotation_factor', 0.45, help='Maximum rotation in image augmentation')
-flags.DEFINE_float('crop_factor', 0.0, upper_bound=1.0, help='Crop image factor (from center)')
-flags.DEFINE_float('edge_emboss', 0.5, lower_bound=0.0, help='Edge embossing factor (for --emboss model only)')
+
+flags.DEFINE_bool('gray', False, short_name='g', 
+    help='Convert images to grayscale')
+flags.DEFINE_bool('edges', False, short_name='e', 
+    help='Convert images to wireframe (edges-only) images')
+flags.DEFINE_bool('emboss', False, short_name='x', 
+    help='Mix wireframe with actual image, can be combined with --gray')
+flags.DEFINE_boolean('zoom', False, short_name='z', 
+    help='Apply zoom augmentation (slows down the training by x5)')
+flags.DEFINE_float('zoom_factor', 0.3, 
+    help='Maximum zoom level for image augmentation (for --zoom model only)')
+flags.DEFINE_float('brightness_factor', 0.3, 
+    help='Maximum brightness level for image augmentation')
+flags.DEFINE_float('rotation_factor', 0.45, 
+    help='Maximum rotation in image augmentation')
+flags.DEFINE_float('crop_factor', 0.0, upper_bound=1.0, 
+    help='Crop image factor (from center)')
+flags.DEFINE_float('edge_emboss', 0.5, lower_bound=0.0, 
+    help='Edge embossing factor (for --emboss model only)')
 flags.DEFINE_float('shuffle_buffer_size', 0.25, 
-                   help='Shuffle buffer, either ratio to number of files (<1) or actual size')
+    help='Shuffle buffer, either ratio to number of files (<1) or actual size')
 
 tf.get_logger().setLevel('ERROR')
 
@@ -308,8 +322,13 @@ def zoom_image(image: Union[np.ndarray, tf.Tensor], zoom: float,
         return image
 
     is_tensor = isinstance(image, tf.Tensor)
-    shape = image.shape if not is_tensor else image.get_shape()
-    image_size = np.array(shape[:2])
+    if not is_tensor:
+        shape = image.shape
+        image_size = np.array(shape[:2])
+    else:
+        shape = image.get_shape()
+        image_size = np.array(shape[:2]) if shape.ndims < 4 else np.array(shape[1:3])
+
     if zoom < 1.0:
         # Zoom in (result is larger)
         crop_image = tf.image.central_crop(image, zoom)

@@ -98,9 +98,9 @@ def _max_rating_detection(detections: List[Detection]) -> Detection:
 def track(cam: cv2.VideoCapture, 
             replace_bg_color: Tuple[int] = None,
             frame_callback: Callable[[TrackObject], bool] = None):
-    """ Detect and tract an object in video stream.
+    """ Detect and track an object in video stream.
 
-    This function continously monitors given video stream and detects objects coming in to the vision field. 
+    The function continously monitors given video stream and detects objects coming in to the vision field. 
     It tracks an object detected while it is moving across the vision field and detects when it stops.
 
     The function yields every frame taken from the device along with detected object's bounding box 
@@ -116,6 +116,9 @@ def track(cam: cv2.VideoCapture,
 
     Yields:
         `TrackObject` object
+
+    Returns:
+        `True` if no more frames from video stream were received, `False` if terminated with callback
 
     Examples:
         >>> cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)
@@ -187,7 +190,6 @@ def track_detect(
     replace_bg_color: Tuple[int] = None,
     use_rating: bool = True,
     frame_callback: Callable[[TrackObject], bool] = None):
-
     """ Detects and classifies objects in a video stream.
 
     This function continously monitors given frame source, detects objects coming in to the vision field

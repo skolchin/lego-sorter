@@ -1,5 +1,5 @@
 # LEGO sorter project
-# Zoom test
+# Testing various zoom functions
 # (c) lego-sorter team, 2022-2023
 
 import cv2
@@ -19,14 +19,6 @@ def draw_ruler(img, x=50, y=-1):
         cv2.putText(img, f'{int(n)}', (x-5,y+10), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.5, imu.COLOR_BLACK)
         x += int(w/10)
 
-# https://stackoverflow.com/questions/69050464/zoom-into-image-with-opencv
-def zoom_at(img, zoom, pad_color=imu.COLOR_BLACK):
-    cy, cx = [ i //2 for i in img.shape[:-1] ]
-
-    rot_mat = cv2.getRotationMatrix2D((cx,cy), 0, zoom)
-    return cv2.warpAffine(img, rot_mat, img.shape[1::-1], flags=cv2.INTER_NEAREST, 
-        borderMode=cv2.BORDER_CONSTANT, borderValue=pad_color)
-
 def zoom_tf(img, zoom, pad_color=imu.COLOR_BLACK):
     from lib.image_dataset import zoom_image
     return zoom_image(img, zoom, pad_color[0])
@@ -42,10 +34,10 @@ def main(_):
     def apply_zoom(zoom):
         zoomed = np.full((200, 640, 3), imu.COLOR_WHITE, np.uint8)
         draw_ruler(zoomed)
-        zoomed = zoom_at(zoomed, zoom, imu.COLOR_WHITE)
+        zoomed = imu.zoom_at(zoomed, zoom, imu.COLOR_WHITE)
         merged = np.vstack((original, zoomed))
         ax.imshow(merged)
-        ax.set_title(f'{zoom:.4f}')
+        ax.set_title(f'{zoom:.1f}')
         fig.canvas.draw_idle()
 
     slider = Slider(
@@ -60,6 +52,23 @@ def main(_):
     slider.on_changed(apply_zoom)
     apply_zoom(1.0)
     plt.show()
+
+def main_alt(_):
+    from lib.image_dataset import load_dataset
+
+    ds = load_dataset()
+    plt.figure(figsize=(8, 8))
+    for images, labels in ds.tfds.take(1):
+        resized_images = zoom_tf(images, 1.5, (255,))
+        for i in range(4):
+            _ = plt.subplot(2, 2, i + 1)
+            label = ds.class_names[np.argmax(labels[i])]
+            image = resized_images[i].numpy()
+            plt.title(f'{label}')
+            plt.imshow(image.astype('uint8'))
+            plt.axis('off')
+    plt.show()
+
 
 if __name__ == '__main__':
     app.run(main)
