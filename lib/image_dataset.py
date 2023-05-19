@@ -4,6 +4,7 @@
 
 import os
 import numpy as np
+import logging
 import tensorflow as tf
 import tensorflow_addons as tfa
 import matplotlib.pyplot as plt
@@ -17,8 +18,9 @@ from typing import Tuple, Iterable, Union
 from lib.globals import IMAGE_DIR, BATCH_SIZE, IMAGE_SIZE
 from lib.model import preprocess_input
 
-FLAGS = flags.FLAGS
+_logger = logging.getLogger('lego-sorter')
 
+FLAGS = flags.FLAGS
 flags.DEFINE_bool('gray', False, short_name='g', 
     help='Convert images to grayscale')
 flags.DEFINE_bool('edges', False, short_name='e', 
@@ -138,6 +140,13 @@ def _drop_seed(feature, label, seed):
 
 def load_dataset() -> ImageDataset:
     """ Load images into a dataset """
+
+    _flags = []
+    if FLAGS.gray: _flags.append('gray')
+    if FLAGS.edges: _flags.append('edges')
+    if FLAGS.emboss: _flags.append('emboss')
+    if FLAGS.zoom: _flags.append('zoom')
+    _logger.debug(f'Model type flags: {", ".join(_flags)}')
 
     seed = np.random.randint(1e6)
     ds = image_dataset_from_directory(

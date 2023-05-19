@@ -18,6 +18,8 @@ FLAGS = flags.FLAGS
 flags.DEFINE_integer('num_layers', default=2,
                      lower_bound=0, upper_bound=3,
                      help='Number of extra layers before classification head')
+flags.DEFINE_integer('apply_gap', 0, lower_bound=0, upper_bound=1,
+                      help='Apply GlobalAveragePooling2D to base model output')
 flags.DEFINE_integer('units1', 512, help='Extra layer 1 size')
 flags.DEFINE_integer('units2', 128, help='Extra layer 2 size')
 flags.DEFINE_integer('units3', 64, help='Extra layer 3 size')
@@ -33,7 +35,7 @@ flags.DEFINE_float('learning_rate', 1e-3, help='Learning rate')
 flags.DEFINE_float('momentum', 0, help='Momentum (for SGD optimizer only)')
 flags.DEFINE_float('label_smoothing', 0.01, help='Label smoothing')
 
-def make_model_params(num_labels: int, params: Mapping[str, float]) -> tf.keras.Model:
+def make_model_params(num_labels: int, params: Mapping[str, float], fine_tuning: bool = False) -> tf.keras.Model:
     """ Make and compile a Keras model with specified parameters.
 
     List of supported parameters see in FLAGS.
@@ -53,18 +55,27 @@ def make_model_params(num_labels: int, params: Mapping[str, float]) -> tf.keras.
 
     # Feature extractor
     vgg16 = VGG16(weights='imagenet', include_top=False, input_tensor=last_layer)
-    vgg16.trainable = False
+
+    if not fine_tuning:
+        vgg16.trainable = False
+    else:
+        _logger.debug('Model is building in fine-tuning mode')
+        for layer in vgg16.layers[:16]:
+            layer.trainable = False
 
     model = tf.keras.models.Sequential()
     model.add(input_layer)
     model.add(vgg16)
+
+    # GAP layer
+    if params.get('apply_gap'):
+        model.add(tf.keras.layers.GlobalAveragePooling2D())
+        _logger.debug('GAP layer added')
+
     model.add(tf.keras.layers.Flatten())
 
-    # Either dense or GAP layers should be used
-    # model.add(tf.keras.layers.GlobalAveragePooling2D())
-
     # Dense layers
-    _logger.debug(f'Number of dense layers: {params["num_layers"]}+1')
+    _logger.debug(f'Number of intermediate dense layers: {params["num_layers"]}')
     for n in range(params['num_layers']):
         key = f'regularize{n+1}'
         reg = tf.keras.regularizers.l2(params[key]) \
@@ -88,23 +99,18 @@ def make_model_params(num_labels: int, params: Mapping[str, float]) -> tf.keras.
         if key in params and params[key] > 0.0 else None
     model.add(tf.keras.layers.Dense(num_labels, activation='softmax', kernel_regularizer=l2_reg))
 
-    # Make an optimizer
-    match params['optimizer']:
-        case 'Adam':
-            opt = tf.keras.optimizers.Adam(
-                learning_rate=tf.keras.optimizers.schedules.ExponentialDecay(
-                    initial_learning_rate=params['learning_rate'],
-                    decay_steps=1000,
-                    decay_rate=0.96,
-            ))
-        case 'SGD':
-            opt = tf.keras.optimizers.SGD(
-                learning_rate=params['learning_rate'],
-                momentum=params['momentum']
-            )
+    # Optimizer
+    lr = params['learning_rate'] if not fine_tuning else 1e-5
+    match params.get('optimizer', 'Adam').lower():
+        case 'adam':
+            opt = tf.keras.optimizers.Adam(learning_rate=lr)
+        case 'sgd':
+            opt = tf.keras.optimizers.SGD(learning_rate=lr, momentum=params['momentum'])
+        case 'rmsprop':
+            opt = tf.keras.optimizers.experimental.RMSprop(learning_rate=lr, momentum=params['momentum'])
         case _:
             raise ValueError(f'Unknown optimizer type: {params["optimizer"]}')
-    _logger.debug(f'Using {params["optimizer"]} optimizer with LR={params["learning_rate"]}')
+    _logger.debug(f'Using {params["optimizer"]} optimizer with LR={lr}')
 
     # Compile & build
     model.compile(
@@ -115,13 +121,14 @@ def make_model_params(num_labels: int, params: Mapping[str, float]) -> tf.keras.
     model.build([None] + list(input_shape))
     return model
 
-def make_model(num_labels: int) -> tf.keras.Model:
+def make_model(num_labels: int, fine_tuning: bool = False) -> tf.keras.Model:
     """ Make and compile a Keras model with parameters defined in run-time FLAGS """
 
     return make_model_params(
         num_labels,
         params={
             'num_layers': FLAGS.num_layers,
+            'apply_gap': FLAGS.apply_gap,
             'units1': FLAGS.units1,
             'units2': FLAGS.units2,
             'units3': FLAGS.units3,
@@ -136,9 +143,9 @@ def make_model(num_labels: int) -> tf.keras.Model:
             'momentum': FLAGS.momentum,
             'learning_rate': FLAGS.learning_rate,
             'label_smoothing': FLAGS.label_smoothing,
-        }
+        },
+        fine_tuning=fine_tuning
     )
-
 
 def _get_checkpoint_dir() -> str:
     match (FLAGS.gray, FLAGS.edges, FLAGS.emboss):
@@ -156,13 +163,10 @@ def _get_checkpoint_dir() -> str:
             raise ValueError('Invalid flags combination')
 
     if FLAGS.zoom: subdir += '_zoom'
-    _logger.debug(f'{subdir} model used')
-
     return os.path.join(CHECKPOINT_DIR, subdir)
 
 def get_checkpoint_callback() -> tf.keras.callbacks.Callback:
     """ Build a callback to save weigths while fitting a model """
-
     return tf.keras.callbacks.ModelCheckpoint(
         filepath=os.path.join(_get_checkpoint_dir(), 'cp-{epoch:04d}.ckpt'),
         save_weights_only=True,
@@ -177,12 +181,25 @@ def get_early_stopping_callback(patience: int = 5) -> tf.keras.callbacks.Callbac
     This is basically a wrapper on Tensorflow's `EarlyStopping` callback for
     not importing tf package in the main script.
     """
-
     return tf.keras.callbacks.EarlyStopping(
         monitor='val_loss',
         mode='min',
         patience=patience,
         restore_best_weights=True,
+        verbose=0)
+
+def get_lr_reduce_callback(patience: int = 5) -> tf.keras.callbacks.Callback:
+    """ Build a callback to reduce LR on plateau.
+
+    This is basically a wrapper on Tensorflow's `ReduceLROnPlateau` callback for
+    not importing tf package in the main script.
+    """
+    return tf.keras.callbacks.ReduceLROnPlateau(
+        monitor='val_categorical_accuracy', 
+        factor=0.6, 
+        patience=patience, 
+        mode='max', 
+        min_lr=1e-6,
         verbose=0)
 
 def load_model(model: tf.keras.Model) -> tf.keras.Model:

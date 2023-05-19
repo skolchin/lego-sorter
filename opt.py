@@ -42,11 +42,12 @@ def main(_):
 
         params = {
             'num_layers': trial.suggest_int('num_layers', 1, 3),
+            'apply_gap': trial.suggest_int('apply_gap', 0, 1),
             'units1': trial.suggest_int('units1', 256, 1024, step=64),
             'dropout1': trial.suggest_float('dropout1', 0.0, 0.5),
             'regularize1': trial.suggest_float('regularize1', 0.0, 0.1),
             'regularize0': trial.suggest_float('regularize0', 0.0, 0.1),
-            'optimizer': trial.suggest_categorical('optimizer', ['SGD', 'Adam']),
+            'optimizer': trial.suggest_categorical('optimizer', ['SGD', 'Adam', 'RMSProp']),
             'label_smoothing': trial.suggest_float('label_smoothing',  0.0, 0.1),
         }
         for n in range(2, params['num_layers']+1):
@@ -63,10 +64,16 @@ def main(_):
             })
         match params['optimizer']:
             case 'Adam':
-                params['learning_rate'] = trial.suggest_float('adam_learning_rate', 1e-5, 1e-1, log=True)
+                params['learning_rate'] = trial.suggest_float('adam_learning_rate', 1e-4, 1e-1, log=True)
+
             case 'SGD':
-                params['learning_rate'] = trial.suggest_float('sgd_learning_rate', 1e-5, 1e-1, log=True)
-                params['momentum'] = trial.suggest_float('sgd_momentum', 1e-5, 1e-1, log=True)
+                params['learning_rate'] = trial.suggest_float('sgd_learning_rate', 1e-4, 1e-1, log=True)
+                params['momentum'] = trial.suggest_float('sgd_momentum', 1e-4, 1e-1, log=True)
+
+            case 'RMSProp':
+                params['learning_rate'] = trial.suggest_float('rms_learning_rate', 1e-4, 1e-1, log=True)
+                params['momentum'] = trial.suggest_float('rms_momentum', 1e-4, 1e-1, log=True)
+
         logger.debug(f'Optimization run params: {params}')
 
         model = make_model_params(num_labels, params)

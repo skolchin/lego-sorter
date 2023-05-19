@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from absl import app, flags
 
 logging.basicConfig(format='%(levelname)s: %(message)s')
+logger = logging.getLogger('lego-sorter')
 
 import lib.globals
 from lib.model import (
@@ -14,6 +15,7 @@ from lib.model import (
     load_model, 
     get_checkpoint_callback, 
     get_early_stopping_callback,
+    get_lr_reduce_callback,
     cleanup_checkpoints
 )
 
@@ -39,12 +41,17 @@ flags.DEFINE_integer('epoch', default=30, lower_bound=1, short_name='n',
     help='Number of epoch to train model for')
 flags.DEFINE_boolean('show', default=True, help='Show image samples and plots')
 flags.DEFINE_boolean('save', default=True, help='Save model to disk')
+flags.DEFINE_boolean('debug', False, help='Set debug logging level')
+flags.DEFINE_boolean('fine', False, short_name='f', help='Train in fine tuning mode')
 flags.declare_key_flag('gray')
 flags.declare_key_flag('edges')
+flags.declare_key_flag('emboss')
 flags.declare_key_flag('zoom')
 
-def main(argv):
+def main(_):
     """ Train the LEGO Sorter model """
+
+    logger.setLevel(logging.DEBUG if FLAGS.debug else logging.INFO)
 
     image_data = load_dataset()
     if FLAGS.show:
@@ -54,16 +61,19 @@ def main(argv):
     train_data, test_data = split_dataset(image_data)
     aug_data = augment_dataset(train_data)
 
-    model = make_model(num_labels)
+    model = make_model(num_labels, FLAGS.fine)
     print('\nModel summary:\n---')
     model.summary()
+
+    callbacks_list = []
     if FLAGS.save:
+        callbacks_list.append(get_checkpoint_callback())
         load_model(model)
 
-    if not FLAGS.save:
-        callbacks_list = [get_early_stopping_callback()]
+    if not FLAGS.fine:
+        callbacks_list.append(get_early_stopping_callback())
     else:
-        callbacks_list = [get_early_stopping_callback(), get_checkpoint_callback()]
+        callbacks_list.extend([get_lr_reduce_callback(), get_early_stopping_callback(20)])
 
     history = model.fit(
         aug_data, 
