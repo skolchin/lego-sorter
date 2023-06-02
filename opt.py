@@ -52,10 +52,10 @@ def main(_):
         }
         for n in range(2, params['num_layers']+1):
             layer_size = trial.suggest_int(f'units{n}', 64, 1024, step=64)
-            prev_layer_size = params[f'units{n-1}']
-            if layer_size > prev_layer_size:
-                # layers must be decreasing in size
-                raise optuna.TrialPruned(f'Layer {n} size is greater than previous one ({layer_size}>{prev_layer_size})')
+            # prev_layer_size = params[f'units{n-1}']
+            # if layer_size > prev_layer_size:
+            #     # layers must be decreasing in size
+            #     raise optuna.TrialPruned(f'Layer {n} size is greater than previous one ({layer_size}>{prev_layer_size})')
 
             params.update({
                 f'units{n}': layer_size,

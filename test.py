@@ -66,6 +66,7 @@ def main(argv):
     num_labels = len(image_data.class_names)
     model = make_model(num_labels)
     load_model(model)
+    model.layers[0].summary()
     model.summary()
 
     if FLAGS.label:

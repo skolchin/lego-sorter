@@ -26,7 +26,7 @@ HIST_WINDOW_SIZE = (240, 320)
 HIST_WINDOW_TITLE = 'Histogram'
 REF_WINDOW_SIZE = (240, 320)
 REF_WINDOW_TITLE = 'Ref'
-BACK_COLOR = imu.COLOR_GRAY
+BACK_COLOR = imu.COLOR_WHITE
 
 def show_welcome_screen():
     """ Shows splash screen while all necessary stuff is been loaded """
