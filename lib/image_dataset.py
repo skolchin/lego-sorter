@@ -16,7 +16,7 @@ from itertools import zip_longest
 from typing import Tuple, Iterable, Union
 
 from lib.globals import IMAGE_DIR, BATCH_SIZE, IMAGE_SIZE
-from lib.model import preprocess_input
+from lib.model import preprocess_input, restore_processed_image
 
 _logger = logging.getLogger('lego-sorter')
 
@@ -88,7 +88,7 @@ def _preprocess(images, labels=None, seed=None):
     """ Image preprocessing function """
     if FLAGS.crop_factor:
         images = tf.image.central_crop(images, FLAGS.crop_factor)
-        images = tf.image.resize(images, IMAGE_SIZE, 'bicubic', preserve_aspect_ratio=False)
+        images = tf.image.resize(images, IMAGE_SIZE, preserve_aspect_ratio=False)
 
     images = preprocess_input(images)
 
@@ -155,7 +155,6 @@ def load_dataset() -> ImageDataset:
         color_mode='rgb',
         batch_size=None,
         image_size=IMAGE_SIZE,
-        interpolation='bicubic',
         shuffle=False,
         crop_to_aspect_ratio=True,
         seed=seed,
@@ -206,7 +205,7 @@ def show_samples(tfds: tf.data.Dataset, class_names: Iterable[str], num_samples:
     for images, labels in get_dataset_samples(tfds):
         for i in range(num_samples):
             _ = plt.subplot(int(num_samples/3), int(num_samples/3), i + 1)
-            plt.imshow(images[i].numpy().astype('uint8'), cmap=cmap)
+            plt.imshow(restore_processed_image(images[i].numpy()), cmap=cmap)
             label = np.argmax(labels[i])
             plt.title(class_names[label])
             plt.axis('off')
@@ -374,7 +373,8 @@ def predict_image_files_zoom(
 
             plt.figure(f'{file_name} @ {zoom}')
             plt.title(f'{true_label or "?"} <- {predicted_label} ({predicted_prob:.2%}) @ {zoom}')
-            plt.imshow(processed_image.numpy() if show_processed_image else zoomed_image.numpy(), cmap=cmap)
+            img_to_show = restore_processed_image(processed_image.numpy()) if show_processed_image else zoomed_image.numpy()
+            plt.imshow(img_to_show, cmap=cmap)
             plt.axis('off')
 
     plt.show()
@@ -419,7 +419,7 @@ def show_prediction_samples(
             predicted_prob = prediction[0][most_likely]
 
             plt.title(f'{label} <- {predicted_label} ({predicted_prob:.2%})')
-            plt.imshow(image.astype('uint8'), cmap=cmap)
+            plt.imshow(restore_processed_image(image), cmap=cmap)
             plt.axis('off')
     plt.show()
 

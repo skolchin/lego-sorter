@@ -1,16 +1,27 @@
 # LEGO sorter project
 # CNN model definition and support functions
-# Based on standard VGG-16 architecture with additional layers to support transfer learning
+# Based on standard  pretrained CNN architecture with additional layers to support transfer learning
 # (c) lego-sorter team, 2022-2023
 
 import os
 import tensorflow as tf
 import logging
 from absl import flags
-from keras.applications.vgg16 import VGG16, preprocess_input      # pylint: disable=unused-import
 from typing import Mapping
-
 from lib.globals import IMAGE_SIZE, CHECKPOINT_DIR
+
+# from keras.applications.vgg19 import VGG19, preprocess_input
+# MODEL_CLASS = VGG19
+# restore_processed_image = lambda x: x.astype('uint8')
+""" This model-specific lambda func is used to convert images from a dataset format to something suitable for display """
+
+# from keras.applications.inception_v3 import InceptionV3, preprocess_input
+# MODEL_CLASS = InceptionV3
+# restore_processed_image = lambda x: (127.5 * (x + 1.0)).astype('uint8')
+
+from keras.applications.mobilenet_v3 import MobileNetV3Large, preprocess_input
+MODEL_CLASS = MobileNetV3Large
+restore_processed_image = lambda x: x.astype('uint8')
 
 _logger = logging.getLogger('lego-sorter')
 
@@ -35,7 +46,7 @@ flags.DEFINE_float('learning_rate', 1e-3, help='Learning rate')
 flags.DEFINE_float('momentum', 0, help='Momentum (for SGD optimizer only)')
 flags.DEFINE_float('label_smoothing', 0.01, help='Label smoothing')
 
-def make_model_params(num_labels: int, params: Mapping[str, float], fine_tuning: bool = False) -> tf.keras.Model:
+def make_model_with_params(num_labels: int, params: Mapping[str, float], fine_tuning: bool = False) -> tf.keras.Model:
     """ Make and compile a Keras model with specified parameters.
 
     List of supported parameters see in FLAGS.
@@ -54,18 +65,19 @@ def make_model_params(num_labels: int, params: Mapping[str, float], fine_tuning:
     _logger.debug(f'Input shape set to {input_shape}')
 
     # Feature extractor
-    vgg16 = VGG16(weights='imagenet', include_top=False, input_tensor=last_layer)
+    base_model = MODEL_CLASS(weights='imagenet', include_top=False, input_tensor=last_layer)
+    _logger.debug(f'Using {MODEL_CLASS.__name__} model')
 
     if not fine_tuning:
-        vgg16.trainable = False
+        base_model.trainable = False
     else:
-        _logger.debug('Model is building in fine-tuning mode')
-        for layer in vgg16.layers[:16]:
+        _logger.debug('Model is been built in fine-tuning mode')
+        for layer in base_model.layers[:16]:
             layer.trainable = False
 
     model = tf.keras.models.Sequential()
     model.add(input_layer)
-    model.add(vgg16)
+    model.add(base_model)
 
     # GAP layer
     if params.get('apply_gap'):
@@ -124,7 +136,7 @@ def make_model_params(num_labels: int, params: Mapping[str, float], fine_tuning:
 def make_model(num_labels: int, fine_tuning: bool = False) -> tf.keras.Model:
     """ Make and compile a Keras model with parameters defined in run-time FLAGS """
 
-    return make_model_params(
+    return make_model_with_params(
         num_labels,
         params={
             'num_layers': FLAGS.num_layers,
@@ -163,7 +175,8 @@ def _get_checkpoint_dir() -> str:
             raise ValueError('Invalid flags combination')
 
     if FLAGS.zoom: subdir += '_zoom'
-    return os.path.join(CHECKPOINT_DIR, subdir)
+    model_class = MODEL_CLASS.__name__.lower()
+    return os.path.join(CHECKPOINT_DIR, model_class, subdir)
 
 def get_checkpoint_callback() -> tf.keras.callbacks.Callback:
     """ Build a callback to save weigths while fitting a model """
