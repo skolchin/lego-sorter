@@ -21,7 +21,7 @@ flags.declare_key_flag('edges')
 flags.declare_key_flag('zoom')
 
 del FLAGS.zoom_factor
-flags.DEFINE_float('zoom_factor', 2.5, short_name='zf', help='ROI zoom factor')
+flags.DEFINE_float('zoom_factor', 2.2, short_name='zf', help='ROI zoom factor')
 flags.DEFINE_integer('camera', 0, short_name='c', help='Camera ID (0,1,...)')
 flags.DEFINE_string('file', None, short_name='f', help='Process video from given file')
 flags.DEFINE_boolean('debug', False, help='Start with debug info')

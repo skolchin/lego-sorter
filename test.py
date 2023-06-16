@@ -81,7 +81,7 @@ def main(argv):
         else:
             zoom_levels = FLAGS.zoom_factor
             if len(FLAGS.zoom_factor) == 1 and FLAGS.zoom_factor[0] == 0.0:
-                zoom_levels = [x/100.0 for x in range(100, 350, 25)]
+                zoom_levels = [x/100.0 for x in range(50, 300, 25)]
             predict_image_files_zoom(model, FLAGS.file, image_data.class_names, true_labels, zoom_levels, 
                 show_processed_image=True)
 

@@ -15,7 +15,6 @@ from lib.model import make_model_with_params
 from lib.image_dataset import load_dataset, split_dataset, augment_dataset
 
 logger = logging.getLogger('lego-sorter')
-logging.getLogger(optuna.__name__).setLevel(logging.ERROR)
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('epoch', default=10, lower_bound=1, short_name='n',
@@ -31,7 +30,7 @@ flags.declare_key_flag('zoom')
 
 def suggest_params(trial: optuna.Trial) -> dict:
     params = {
-        'num_layers': trial.suggest_int('num_layers', 1, 3),
+        'num_layers': trial.suggest_int('num_layers', 2, 4),
         'apply_gap': trial.suggest_int('apply_gap', 0, 1),
         'units1': trial.suggest_int('units1', 256, 1024, step=64),
         'dropout1': trial.suggest_float('dropout1', 0.0, 0.5),
@@ -43,9 +42,9 @@ def suggest_params(trial: optuna.Trial) -> dict:
     for n in range(2, params['num_layers']+1):
         layer_size = trial.suggest_int(f'units{n}', 64, 1024, step=64)
         prev_layer_size = params[f'units{n-1}']
-        if layer_size > prev_layer_size:
-            # layers must be decreasing in size
-            raise optuna.TrialPruned(f'Layer {n} size is greater than previous one ({layer_size}>{prev_layer_size})')
+        # if layer_size > prev_layer_size:
+        #     # layers must be decreasing in size
+        #     raise optuna.TrialPruned(f'Layer {n} size is greater than previous one ({layer_size}>{prev_layer_size})')
 
         params.update({
             f'units{n}': layer_size,
@@ -70,6 +69,7 @@ def suggest_params(trial: optuna.Trial) -> dict:
 def get_metrics(history):
     loss = history.history['val_loss'][-1]
     logger.debug(f'Validation loss: {loss:.4f}')
+
     acc = history.history['val_categorical_accuracy'][-1]
     logger.debug(f'Validation accuracy: {acc:.4f}')
     return loss, acc
@@ -94,6 +94,7 @@ def main(_):
 
     # Data prep
     logger.setLevel(logging.DEBUG if FLAGS.debug else logging.INFO)
+    logging.getLogger(optuna.__name__).setLevel(logging.INFO if FLAGS.debug else logging.ERROR)
     image_data = load_dataset()
  
     num_labels = len(image_data.class_names)
@@ -106,9 +107,7 @@ def main(_):
 
         params = suggest_params(trial)
         model = make_model_with_params(num_labels, params)
-        callbacks = [
-            tf.keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=3, verbose=0),
-            optuna.integration.TFKerasPruningCallback(trial=trial, monitor='val_loss')]
+        callbacks = [optuna.integration.TFKerasPruningCallback(trial=trial, monitor='val_loss')]
         history = model.fit(aug_data,
                   epochs=FLAGS.epoch,
                   verbose=int(FLAGS.debug),
@@ -123,9 +122,7 @@ def main(_):
 
         params = suggest_params(trial)
         model = make_model_with_params(num_labels, params)
-        callbacks = [
-            tf.keras.callbacks.EarlyStopping(monitor='val_categorical_accuracy', mode='min', patience=3, verbose=0),
-            optuna.integration.TFKerasPruningCallback(trial=trial, monitor='val_loss')]
+        callbacks = [optuna.integration.TFKerasPruningCallback(trial=trial, monitor='val_categorical_accuracy')]
         history = model.fit(aug_data,
                   epochs=FLAGS.epoch,
                   verbose=int(FLAGS.debug),
@@ -136,11 +133,11 @@ def main(_):
         return acc
 
     def opt_fun_all(trial: optuna.Trial):
-        """ Optimization function for accuracy and loss target """
+        """ Optimization function for accuracy and loss targets """
 
         params = suggest_params(trial)
         model = make_model_with_params(num_labels, params)
-        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_categorical_accuracy', mode='min', patience=3, verbose=0)]
+        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=3, verbose=0)]
         history = model.fit(aug_data,
                   epochs=FLAGS.epoch,
                   verbose=int(FLAGS.debug),
@@ -151,19 +148,18 @@ def main(_):
         return loss, acc
 
     # Main optimization routine
-
     match FLAGS.target:
         case 'loss':
             logger.info('Optimiziting for minimal loss')
             study = optuna.create_study(study_name='lego-sorter-loss', direction='minimize',
-                pruner=optuna.pruners.HyperbandPruner(max_resource=FLAGS.epoch, reduction_factor=3, bootstrap_count=4))
+                pruner=optuna.pruners.MedianPruner())
             study.optimize(opt_fun_loss, n_trials=FLAGS.trials, show_progress_bar=True)
             print_metric(study, 'loss')
 
         case 'accuracy':
             logger.info('Optimiziting for maximum accuracy')
             study = optuna.create_study(study_name='lego-sorter-accuracy', direction='maximize',
-                pruner=optuna.pruners.HyperbandPruner(max_resource=FLAGS.epoch, reduction_factor=3, bootstrap_count=4))
+                pruner=optuna.pruners.MedianPruner())
             study.optimize(opt_fun_accuracy, n_trials=FLAGS.trials, show_progress_bar=True)
             print_metric(study, 'accuracy')
  
