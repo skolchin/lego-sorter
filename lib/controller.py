@@ -14,6 +14,7 @@ from .exceptions import NoSorter, NotConnectedToSorter
 
 _logger = logging.getLogger('lego-sorter')
 
+
 class Controller:
     """ HW controller 
         There is only one sorter can be controlled by appliciation, so we use Singleton pattern 
@@ -130,6 +131,8 @@ class Controller:
         with self.lock:
             port = self.port
 
+        _logger.info(f'Try connect to comport: {self.port}')
+
         arduino = serial.Serial(port, 9600)
 
         confirmation_wait = False
@@ -160,7 +163,8 @@ class Controller:
             with self.lock:
                 if not self.inboundQueue.empty() and not confirmation_wait:
                     current_command = self.inboundQueue.get()
-                    _logger.info(f"Inbound queue get command {current_command}")
+                    _logger.info(
+                        f"Inbound queue get command {current_command}")
 
                     if current_command != self.current_state:
                         arduino.write(bytes(current_command, 'utf-8'))

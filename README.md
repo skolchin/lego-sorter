@@ -86,3 +86,6 @@ When started, several hot keys are available:
     C   Start or stop saving video stream to a file (in `out` directory`)
     S   Display video camera settings and adjustments
     Q or ESC    Quit
+
+## Controller state machine
+![alt text](https://github.com/skolchin/lego-sorter/tree/controller_debug/states.png?raw=true)

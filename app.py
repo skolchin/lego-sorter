@@ -10,6 +10,7 @@ from absl import flags
 
 from flask import Flask, render_template, session, Response
 from flask_socketio import SocketIO, emit, disconnect
+from lib.controller import Controller
 
 from lib.globals import *
 from lib.image_dataset import *
@@ -29,7 +30,7 @@ app.config['SECRET_KEY'] = 'secret!'
 
 socketio = SocketIO(app, async_mode='gevent')
 
-controller = DummyController()
+controller = Controller()  # DummyController()
 camera = Camera(controller)
 
 # @app.before_first_request
@@ -37,6 +38,8 @@ camera = Camera(controller)
 #     pass
 
 # REST endpoints
+
+
 @app.route('/list/ports')
 def ports_list():
     return Response(json.dumps(controller.get_ports()),  mimetype='application/json')
