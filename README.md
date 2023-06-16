@@ -88,4 +88,4 @@ When started, several hot keys are available:
     Q or ESC    Quit
 
 ## Controller state machine
-![alt text](https://github.com/skolchin/lego-sorter/tree/controller_debug/states.png?raw=true)
+![alt text](https://github.com/skolchin/lego-sorter/tree/controller_debug/states.jpg?raw=true)
