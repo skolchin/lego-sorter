@@ -47,8 +47,8 @@ class Camera:
                      cv2.VideoWriter.fourcc('M', 'J', 'P', 'G'))
         self.cam.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_SIZE[1])
         self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_SIZE[0])
-        # self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, auto_exposure)
-        # self.cam.set(cv2.CAP_PROP_EXPOSURE, exposure)
+        self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, auto_exposure)
+        self.cam.set(cv2.CAP_PROP_EXPOSURE, exposure)
 
     def __gen_frames(self):
         """ Video thread main function """
