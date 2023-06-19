@@ -2,57 +2,58 @@
 #include <yasm.h>
 #include <Servo.h>
 
-#define DEBUG_MODE           0
+#define DEBUG_MODE             0
+#define DEBUG_SKIP_CALIBRATION 0 
 
 // Relay pins
-#define CONVEYOR_PIN         4 
-#define TABLE_PIN            3
+#define CONVEYOR_PIN           4 
+#define TABLE_PIN              3
 
 // Servo pins
-#define TUBE_GATE_SERVO_PIN  2
-#define TURN_SERVO_PIN       10
-#define GATE_SERVO_PIN       9
+#define TUBE_GATE_SERVO_PIN    2
+#define TURN_SERVO_PIN         10
+#define GATE_SERVO_PIN         9
 
 // Stepper calibration pins 
-#define TT_NULL_POSITION     8
+#define TT_NULL_POSITION       8
 
 // Stepper pins
-#define PUL_PIN              12
-#define DIR_PIN              11
+#define PUL_PIN                12
+#define DIR_PIN                11
 
 // Debug LEDs
-#define CALIBRATION_LED_PIN  A1 // green
-#define DROP_LED_PIN         A0 // blue
-#define DROP_UNSRT_LED_PIN   A2 // yellow
-#define DROP_UNRCG_LED_PIN   A3 // red
+#define CALIBRATION_LED_PIN    A1 // green
+#define DROP_LED_PIN           A0 // blue
+#define DROP_UNSRT_LED_PIN     A2 // yellow
+#define DROP_UNRCG_LED_PIN     A3 // red
 
 // Stepper parameters
-#define CALIBRATION_STEPS    10000
-#define CALIBRATION_SPEED    200.0
-#define WORKING_SPEED        1000.0
-#define ACCELERATION         200.0
+#define CALIBRATION_STEPS      10000
+#define CALIBRATION_SPEED      200.0
+#define WORKING_SPEED          1000.0
+#define ACCELERATION           200.0
 
 // Delays and timings
-#define CONVEYOR_START_DELAY 5000
-#define CONVEYOR_WORK_CYCLE  12000
-#define CONVEYOR_PAUSE       10000
-#define SERVO_ACTION_DELAY   500
-#define DROP_ACTION_DELAY    800
-#define STATUS_SEND_TIMING   2500
+#define CONVEYOR_START_DELAY   5000
+#define CONVEYOR_WORK_CYCLE    12000
+#define CONVEYOR_PAUSE         10000
+#define SERVO_ACTION_DELAY     500
+#define DROP_ACTION_DELAY      800
+#define STATUS_SEND_TIMING     2500
 
 // define bucket position with two arrays:
 //  - bucket table rotation angle in steps 
 //  - angle position of recognition camera 
-#define BUCKET_COUNT          18
-#define INNER_BUCKET_POS      110
-#define OUTER_BUCKET_POS      135
-#define WAIT_BUCKET_POS       77
+#define BUCKET_COUNT            18
+#define INNER_BUCKET_POS        110
+#define OUTER_BUCKET_POS        135
+#define WAIT_BUCKET_POS         77
 
-#define START_ROTATION_OFFSET 0
+#define START_ROTATION_OFFSET   0
 
 // gate angles
-#define GATE_OPENED           60
-#define GATE_CLOSED           130
+#define GATE_OPENED             60
+#define GATE_CLOSED             135
 
 const int bucket_table_steps[BUCKET_COUNT] = {0,267,
                                               534,
@@ -152,8 +153,10 @@ void Calibration() {
     
     digitalWrite(CALIBRATION_LED_PIN, HIGH);
     if ( DEBUG_MODE == 1 ) fsm.next(IterateBuckets);
-    else fsm.next(Wait);
+    else fsm.next(Clean);
   }
+
+  if (DEBUG_SKIP_CALIBRATION == 1 && getTimeOnState() > 3000 )  fsm.next(Clean);
 
   stepper.run();
 }
@@ -178,7 +181,7 @@ void IterateBuckets() {
       if ( calibrationBucket + 1 == BUCKET_COUNT )  {
         turnServo.write(WAIT_BUCKET_POS);
         digitalWrite(CALIBRATION_LED_PIN, HIGH);
-        fsm.next(Wait);
+        fsm.next(Clean);
       }
     } else {
       if (millis() - tempTime > 2000) {   
@@ -193,6 +196,19 @@ void IterateBuckets() {
   }
 }
 
+void Clean() {
+  handleTransition();
+
+  if ( fsm.isFirstRun() ) 
+    setGateState(OPENED); 
+  else 
+    if (  getTimeOnState() > DROP_ACTION_DELAY * 5 ) {
+      setGateState(CLOSED);
+
+      fsm.next(Wait);
+    }
+}
+
 void Wait() {
   handleTransition();
 
@@ -202,9 +218,13 @@ void Wait() {
   if (Serial.available() > 0) {
     String data = getSerialData();
 
+
     if (data[0] == 'M') { 
       confirmationMessage(data);
       fsm.next(Move);
+    } else if (data[0] == 'C') { 
+      confirmationMessage(data);
+      fsm.next(Clean);
     } else {
       incorrectInputMessage(data);
     }
@@ -435,6 +455,7 @@ String getState() {
   if (fsm.isInState(Start)) return "Start";
   if (fsm.isInState(Calibration)) return "Calibration";
   if (fsm.isInState(IterateBuckets)) return "IterateBuckets";
+  if (fsm.isInState(Clean)) return "Clean";
   if (fsm.isInState(Wait)) return "Wait";
   if (fsm.isInState(Move)) return "Move";
   if (fsm.isInState(Recognize)) return "Recognize";

@@ -14,11 +14,11 @@ from lib.pipe_utils import FRAME_SIZE, FPS_RATE, green_rect
 
 _logger = logging.getLogger('lego-sorter')
 
+
 class Camera:
     """ Camera encapsulation class """
 
     def __init__(self, controller: Controller, camera_id: int = 0) -> None:
-        self.camera_id = camera_id
         self.controller = controller
         self.cam = None
         self.video_thread = None
@@ -31,9 +31,10 @@ class Camera:
         self.output_frame = None
         self.video_thread = None
 
-        self.reset_camera()
+        self.reset_camera(camera_id)
 
-    def reset_camera(self, auto_exposure=0, exposure=-10.0):
+    def reset_camera(self, camera_id, auto_exposure=0, exposure=-10.0):
+        self.camera_id = camera_id
         self.cam = cv2.VideoCapture(self.camera_id, cv2.CAP_DSHOW)
         if not self.cam.isOpened():
             _logger.error('Cannot open camera, exiting')
@@ -46,8 +47,8 @@ class Camera:
                      cv2.VideoWriter.fourcc('M', 'J', 'P', 'G'))
         self.cam.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_SIZE[1])
         self.cam.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_SIZE[0])
-        # self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, auto_exposure)
-        # self.cam.set(cv2.CAP_PROP_EXPOSURE, exposure)
+        self.cam.set(cv2.CAP_PROP_AUTO_EXPOSURE, auto_exposure)
+        self.cam.set(cv2.CAP_PROP_EXPOSURE, exposure)
 
     def __gen_frames(self):
         """ Video thread main function """
@@ -56,10 +57,10 @@ class Camera:
             if self.stopCameraEvent.is_set():
                 # Stop event
                 return False
-            
+
             if track_object.state == ObjectState.NEW:
                 self.controller.recognize()
-                
+
             return True
 
         def detect_callback(frame: np.ndarray):
@@ -68,9 +69,9 @@ class Camera:
 
         _logger.debug("Starting video stream")
         for detection in track_detect(
-            self.cam,
-            detect_callback=detect_callback,
-            frame_callback=frame_callback):
+                self.cam,
+                detect_callback=detect_callback,
+                frame_callback=frame_callback):
 
             if detection.bbox is not None:
                 green_rect(detection.frame, detection.bbox)
