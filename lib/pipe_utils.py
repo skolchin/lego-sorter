@@ -4,15 +4,15 @@
 
 import os
 import cv2
+import json
+import logging
 import numpy as np
 import img_utils22 as imu
-import logging
-import json
 from datetime import datetime
 from subprocess import check_output, CalledProcessError
 from typing import Iterable, Tuple, Mapping
 
-from .globals import IMAGE_DIR, OUTPUT_DIR, RETRAIN_DIR
+from .globals import ROOT_DIR, IMAGE_DIR, OUTPUT_DIR, RETRAIN_DIR
 from .status_info import StatusInfo
 
 logger = logging.getLogger('lego-tracker')
@@ -184,8 +184,7 @@ def extract_roi(
 _save_count: int = 1
 
 def save_roi_out(roi: np.ndarray, label: str, prob: float):
-    """ Save an ROI picture under detected label to out\roi\ directory
-    """
+    """ Save an ROI picture with some detected label to ./out/roi directory """
     global _save_count
 
     roi_dir = os.path.join(OUTPUT_DIR, 'roi', label)
@@ -194,8 +193,7 @@ def save_roi_out(roi: np.ndarray, label: str, prob: float):
     _save_count += 1
 
 def save_roi_retrain(roi: np.ndarray, label: str, prob: float, orig_label: str):
-    """ Save an ROI picture under detected label to retrain\ directory along with extra info
-    """
+    """ Save an ROI picture with some detected label to ./retrain directory """
     global _save_count
 
     roi_dir = os.path.join(RETRAIN_DIR, label)
@@ -249,7 +247,7 @@ def preprocess_image(frame: np.ndarray) -> np.ndarray:
     return frame.astype('uint8')
 
 def get_ref_images(class_names: Iterable[str]) -> Mapping[str, np.ndarray]:
-    """ Loads reference images for given class set """
+    """ Loads reference images for given label set """
 
     ref_images = {}
     for label in class_names:
@@ -277,6 +275,22 @@ def choose_label(label: str) -> str:
         
         result = json.loads(out)
         return result.get('label')
+    
     except CalledProcessError as ex:
         logger.exception('Error', ex)
         return None
+
+def apply_cam_props(cam: cv2.VideoCapture):
+    """ Reads cam.cfg file, parses it and applies properties to camera source """
+
+    with open(os.path.join(ROOT_DIR, 'cam.cfg'), 'r') as fp:
+        cfg = {var.strip(): float(val.strip()) for var, _, val in \
+               [line.partition('=') for line in fp.readlines()]}
+        
+        for var, val in cfg.items():
+            cv2_var = f'CAP_PROP_{var.upper()}'
+            cv2_code = getattr(cv2, cv2_var, None)
+            if cv2_code is None:
+                raise ValueError(f'Unknown camera setting {var}')
+            logger.debug(f'Camera setting: {cv2_var}={val}')
+            cam.set(cv2_code, val)

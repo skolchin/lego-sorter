@@ -7,7 +7,7 @@ import logging
 import numpy as np
 from absl import flags
 from enum import IntEnum
-from time import time
+from time import time, sleep
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, List, Callable, Tuple
@@ -21,18 +21,24 @@ _logger = logging.getLogger('lego-tracker')
 
 class ObjectState(IntEnum):
     """ States of object being detected """
-
     NONE = 0
     """ Nothing found """
-
     NEW = 1
     """ New object detected """
-
     MOVE = 2
     """ Object has moved from previous position """
-
     STOP = 3
     """ Object has stopped """
+
+class FrameCallbackReturn(IntEnum):
+    """ Return values of frame_callback """
+    CANCEL = 0
+    """ Cancel processing """
+    CONTINUE = 1
+    """ Continue with next frame """
+    RESET = -1
+    """ Reset tracker and continue """
+
 
 @dataclass
 class TrackObject:
@@ -97,7 +103,7 @@ def _max_rating_detection(detections: List[Detection]) -> Detection:
 
 def track(cam: cv2.VideoCapture, 
             replace_bg_color: Tuple[int] = None,
-            frame_callback: Callable[[TrackObject], bool] = None):
+            frame_callback: Callable[[TrackObject], FrameCallbackReturn] = None):
     """ Detect and track an object in video stream.
 
     The function continously monitors given video stream and detects objects coming in to the vision field. 
@@ -134,6 +140,7 @@ def track(cam: cv2.VideoCapture,
     obj_state: ObjectState = ObjectState.NONE
 
     while True:
+        sleep(0.1)
         ret, frame = cam.read()
         if not ret:
             _logger.info('No more frames, exiting')
@@ -176,12 +183,20 @@ def track(cam: cv2.VideoCapture,
                 frame[bgmask!=255] = replace_bg_color
 
         tro = TrackObject(frame, bgmask, obj_bbox, obj_state)
-        if frame_callback and not frame_callback(tro):
-            return False
-        
-        yield tro
+        if not frame_callback:
+            yield tro
+        else:
+            match frame_callback(tro):
+                case FrameCallbackReturn.CANCEL:
+                    return
+                
+                case FrameCallbackReturn.RESET:
+                    back_sub = _init_back_sub(frame)
+                    obj_tracker = None
+                    obj_state = ObjectState.NONE
 
-    return True
+                case _:    
+                    yield tro
 
 def track_detect(
     cam: cv2.VideoCapture, 
@@ -189,7 +204,7 @@ def track_detect(
     track_time: float = 2.0,
     replace_bg_color: Tuple[int] = None,
     use_rating: bool = True,
-    frame_callback: Callable[[TrackObject], bool] = None):
+    frame_callback: Callable[[TrackObject], FrameCallbackReturn] = None):
     """ Detects and classifies objects in a video stream.
 
     This function continously monitors given frame source, detects objects coming in to the vision field
