@@ -4,8 +4,8 @@
 
 import sys
 import json
-import logging
 import gevent
+import logging
 from absl import flags
 
 from flask import Flask, render_template, session, Response

@@ -8,7 +8,7 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 from absl import app, flags
-from root_dir import OUTPUT_DIR
+from lib.globals import OUTPUT_DIR
 from matplotlib.widgets import Slider
 
 logging.getLogger('lego-tracker').setLevel(logging.ERROR)
@@ -19,7 +19,7 @@ from lib.image_dataset import (
     IMAGE_SIZE,
     zoom_image
 )
-from lib.model import load_model, make_model
+from lib.custom_model import load_model, make_model
 
 FLAGS = flags.FLAGS
 

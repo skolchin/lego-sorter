@@ -1,5 +1,5 @@
 # LEGO sorter project
-# Video recognition pipeline demo
+# Video recognition pipeline
 # (c) lego-sorter team, 2022-2023
 
 import os
@@ -8,14 +8,14 @@ import logging
 from absl import app, flags
 from datetime import datetime
 
-from lib.globals import OUTPUT_DIR
 from lib.pipe_utils import *
-from lib.status_info import StatusInfo
-from lib.object_tracker import track_detect, TrackObject, ObjectState, FrameCallbackReturn
-from lib.model import load_model, make_model
-from lib.image_dataset import fast_get_class_names, predict_image, predict_image_probs
+from lib.globals import OUTPUT_DIR
 from lib.controller import Controller
+from lib.status_info import StatusInfo
 from lib.dummy_controller import DummyController
+from lib.custom_model import load_model, make_model
+from lib.object_tracker import track_detect, TrackObject, ObjectState, FrameCallbackReturn
+from lib.image_dataset import fast_get_class_names, predict_image, predict_image_probs
 
 FLAGS = flags.FLAGS
 flags.declare_key_flag('gray')
@@ -48,7 +48,7 @@ def main(_):
     model = make_model(len(class_names))
     load_model(model)
 
-    frame = np.full(list(FRAME_SIZE) + [3], imu.COLOR_BLACK, np.uint8)
+    frame = np.full(list(FRAME_SIZE) + [3], (0,0,0), np.uint8)
     predict_image(model, frame, class_names)
 
     # Initiazlize camera (either using pre-recorded file or connecting to real video cam)

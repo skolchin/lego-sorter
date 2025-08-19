@@ -1,6 +1,6 @@
 # Lego Sorter project
 
-(c) lego-sorter team (kol+chem), 2022-2023
+(c) lego-sorter team (kol+chem), 2022-2025
 
 LegoSorter is an open-source project aiming to build a machine
 which would be able to recognize and, eventually, automatically sort
@@ -9,10 +9,14 @@ various Lego pieces.
 This repo contains a software part of the machine, hardware setup
 is performed behind the scenes.
 
-The project uses TensorFlow Google's library to perform
-Lego pieces image classification. Currently, it employs
-pre-made VGG-16 CNN trained in transfer learning mode on
-custom rendered Lego pieces image dataset.
+The project uses the following models:
+
+1. Custom model built on top of [VGG-19](https://www.tensorflow.org/api_docs/python/tf/keras/applications/VGG19) or 
+[InceptionV3](https://www.tensorflow.org/api_docs/python/tf/keras/applications/InceptionV3) CNNs and trained 
+with transfer learning on custom rendered Lego pieces image dataset.
+
+2. Pre-trained [OpenBlock model](https://github.com/blokbot-io/OpenBlok/tree/master)
+available from the [project site](https://cdn.blokbot.io/)
 
 So far the project is in some king of R&D stage so no timings are set.
 We wil definetelly share the results to the public as soon as
@@ -20,25 +24,15 @@ we got the result :)
 
 ## Setup
 
-Basic Python setup is required, see requirements.txt for list of packages.
+Basic Python setup is required (3.9+), see requirements.txt for list of packages.
 
-For training, Tensorflow's GPU version is recommended, see, for example,
-this [guide](https://towardsdatascience.com/how-to-finally-install-tensorflow-gpu-on-windows-10-63527910f255)
-on how to install it. For NVIDIA cards
-it should be working fine with CUDA 11.2.0_460.89 and CUDNN 11.2_8.1.1.33
-(available at
-[gdrive](https://drive.google.com/drive/folders/1OgHnA7X_Ey-GSy8eepNUFhnVercTeq_e?usp=share_link)).
+Pre-trained custome model checkpoints will be made available later.
 
-Pre-trained model checkpoints are also available at the link above.
-They should be placed under `checkpoints` directory.
-
-Lego images dataset is quite big and I chose not to publish it.
-
-Currently it was tested under Windows only, Linux support would come up later.
+Lego images dataset for the training is quite big and I chose not to publish it.
 
 ## Model training
 
-To perform model training, run `train.py` script. Several image augmentation modes
+To perform custom model training, run `train_custom.py` script. Several image augmentation modes
 are supported:
 
     -g, --gray  Convert images to grayscale
@@ -62,18 +56,21 @@ Other options:
 ## Model testing
 
 Trained model can be tested with `test.py` script. It supports all augmentation modes
-listed above and the following options:
+listed above and the following options'
 
+    -m, --model     Model name, one of 'vgg', 'inception' or 'openblock' ('openblock' is default)
     -c, --label     Show random prediction samples for given label (class name)
-    -f, --files     Run prediction over given files (could be specified more than once)
-    -m, --confusion Build and show a confusion matrix
+    -f, --files     Run prediction over given file(-s) (could be specified more than once)
+    -x, --confusion Build and show a confusion matrix
+
+Note that 'vgg' and 'inception' models have to be trained before use.
 
 If no options provided, the script would show some random prediction samples
 from images dataset.
 
 ## Inferrence
 
-The `static_pipe.py` script is a prototype of the project's control panel. When run,
+The `pipe.py` script is a prototype of the project's control panel. When run,
 it will connect to a video camera and allow to classify Lego pieces put under
 that camera.
 
@@ -88,4 +85,4 @@ When started, several hot keys are available:
     Q or ESC    Quit
 
 ## Controller state machine
-<img width="600" src="https://github.com/skolchin/lego-sorter/tree/controller_debug/states.jpg?raw=true" alt="States" />
+<img width="600" src="states.jpg" alt="States" />

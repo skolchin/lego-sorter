@@ -4,8 +4,8 @@
 
 import logging
 import serial
-from serial.tools import list_ports
 from queue import Queue, Empty
+from serial.tools import list_ports
 from threading import Event, Thread
 
 class NoSorterException(Exception):

@@ -5,13 +5,14 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
-import logging
 import optuna
-import tensorflow as tf
+import logging
 from absl import app, flags
+from keras.callbacks import EarlyStopping
+from optuna_integration import TFKerasPruningCallback
 
 import lib.globals
-from lib.model import make_model_with_params
+from lib.custom_model import make_model_with_params
 from lib.image_dataset import load_dataset, split_dataset, augment_dataset
 
 logger = logging.getLogger('lego-sorter')
@@ -107,7 +108,7 @@ def main(_):
 
         params = suggest_params(trial)
         model = make_model_with_params(num_labels, params)
-        callbacks = [optuna.integration.TFKerasPruningCallback(trial=trial, monitor='val_loss')]
+        callbacks = [TFKerasPruningCallback(trial=trial, monitor='val_loss')]
         history = model.fit(aug_data,
                   epochs=FLAGS.epoch,
                   verbose=int(FLAGS.debug),
@@ -122,7 +123,7 @@ def main(_):
 
         params = suggest_params(trial)
         model = make_model_with_params(num_labels, params)
-        callbacks = [optuna.integration.TFKerasPruningCallback(trial=trial, monitor='val_categorical_accuracy')]
+        callbacks = [TFKerasPruningCallback(trial=trial, monitor='val_categorical_accuracy')]
         history = model.fit(aug_data,
                   epochs=FLAGS.epoch,
                   verbose=int(FLAGS.debug),
@@ -137,7 +138,7 @@ def main(_):
 
         params = suggest_params(trial)
         model = make_model_with_params(num_labels, params)
-        callbacks = [tf.keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=3, verbose=0)]
+        callbacks = [EarlyStopping(monitor='val_loss', mode='min', patience=3, verbose=0)]
         history = model.fit(aug_data,
                   epochs=FLAGS.epoch,
                   verbose=int(FLAGS.debug),

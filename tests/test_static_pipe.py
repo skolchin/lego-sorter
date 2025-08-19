@@ -6,13 +6,13 @@ import os
 import cv2
 import logging
 import numpy as np
-import img_utils22 as imu
+import lib.img_utils as imu
 from absl import app, flags
 
 import root_dir
 from lib.globals import OUTPUT_DIR
 from lib.pipe_utils import *
-from lib.model import load_model, make_model
+from lib.custom_model import load_model, make_model
 from lib.image_dataset import fast_get_class_names, predict_image
 
 logging.basicConfig(format='%(levelname)s: %(message)s')
@@ -213,7 +213,7 @@ def main(argv):
     imu.imshow(source, 'source', (600, 800))
 
     image = extract_object(source, method='multichannel', extract_roi=True, bbox_relax=0.3, replace_bgclr=None)
-    image = imu.rescale(image, scale=2.0, center=True, pad_color=imu.COLOR_WHITE)
+    image = imu.rescale(image, scale=2.0, center=True, pad_color=(255,255,255))
 
     class_names = fast_get_class_names()
     model = make_model(len(class_names))

@@ -5,7 +5,7 @@
 import cv2
 import logging
 import numpy as np
-import img_utils22 as imu
+import lib.img_utils as imu
 from pathlib import Path
 
 logging.basicConfig(format='%(levelname)s: %(message)s')

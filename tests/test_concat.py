@@ -6,7 +6,7 @@ import os
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
-from root_dir import ROOT_DIR, OUTPUT_DIR
+from lib.globals import ROOT_DIR, OUTPUT_DIR
 
 # from tensorflow.python.framework import ops
 # from tensorflow.python.ops import array_ops

@@ -6,7 +6,7 @@ import os
 import numpy as np
 import logging
 import tensorflow as tf
-import tensorflow_addons as tfa
+import tensorflow_models as tfm
 import matplotlib.pyplot as plt
 from absl import flags
 from keras.utils import image_dataset_from_directory
@@ -16,7 +16,7 @@ from itertools import zip_longest
 from typing import Tuple, Iterable, Union
 
 from lib.globals import IMAGE_DIR, BATCH_SIZE, IMAGE_SIZE
-from lib.model import preprocess_input, restore_processed_image
+from lib.custom_model import preprocess_input, restore_processed_image
 
 _logger = logging.getLogger('lego-sorter')
 
@@ -121,7 +121,7 @@ def _rotate_images(feature, label, seed):
         shape=(num_samples,), seed=seed, minval=FLAGS.rotation_factor*100.0, maxval=FLAGS.rotation_factor*100.0
     )
     degrees = degrees * 0.017453292519943295  # convert the angle in degree to radians
-    rotated_images = tfa.image.rotate(feature, degrees, fill_mode='reflect')
+    rotated_images = tfm.vision.augment.rotate(feature, degrees)
     return rotated_images, label, seed
 
 @tf.function

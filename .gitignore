@@ -1,10 +1,12 @@
 __pycache__/
-.vscode
-/.idea
-/venv
+.vscode/
+.idea/
+.venv/
 *.pyc
 images*/
 checkpoints*/
 video/
 out/
-retrain/
+models/openblock/e2e*
+models/openblock/location*
+models/openblock/manifest.xml

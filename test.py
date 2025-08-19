@@ -10,7 +10,7 @@ import seaborn as sns
 from absl import app, flags
 
 import lib.globals
-from lib.model import load_model, make_model
+from lib.custom_model import load_model, make_model
 
 from lib.image_dataset import (
     load_dataset, 
@@ -53,7 +53,7 @@ del FLAGS.zoom_factor
 flags.DEFINE_multi_float('zoom_factor', None, help='ROI zoom factor', short_name='zf')
 flags.DEFINE_multi_string('file', None, 'Predict for image file(-s)', short_name='f')
 flags.DEFINE_string('label', None, 'Predict for specific label', short_name='c')
-flags.DEFINE_boolean('confusion', None, 'Plot confusion matrix', short_name='m')
+flags.DEFINE_boolean('confusion', None, 'Plot confusion matrix', short_name='x')
 flags.declare_key_flag('gray')
 flags.declare_key_flag('edges')
 flags.declare_key_flag('zoom')

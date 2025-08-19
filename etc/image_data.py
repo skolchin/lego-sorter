@@ -3,14 +3,14 @@
 # (c) lego-sorter team, 2022-2023
 
 import os
+import cv2
 import numpy as np
 import pandas as pd
-import cv2
 import matplotlib.pyplot as plt
 from keras.utils import to_categorical
 from typing import Tuple
 
-from lib.model import preprocess_input
+from lib.custom_model import preprocess_input
 
 IMAGE_DIR = os.path.join(os.path.split(__file__)[0], 'images')
 

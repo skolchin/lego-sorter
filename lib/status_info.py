@@ -4,7 +4,6 @@
 
 import cv2
 import numpy as np
-import img_utils22 as imu
 import logging
 from typing import Iterable
 
@@ -121,10 +120,10 @@ class StatusInfo:
     def _make_image(self, img: np.ndarray = None) -> np.ndarray:
         """ Internal - apply statuses to existing image or construct new one """
         if img is None:
-            img = np.full(list(self.size) + [3], imu.COLOR_WHITE, np.uint8)
+            img = np.full(list(self.size) + [3], (255,255,255), np.uint8)
         x, y = 10, 14
         for (status, important) in self.__status:
-            clr = imu.COLOR_RED if important else imu.COLOR_GREEN
+            clr = (0,0,255) if important else (0,255,0)
             cv2.putText(img, status, (x,y), cv2.FONT_HERSHEY_COMPLEX_SMALL, .6, color=clr)
             y += 16
         return img

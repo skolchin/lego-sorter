@@ -5,7 +5,6 @@
 import logging
 import tensorflow as tf
 from absl import app, flags
-from root_dir import ROOT_DIR, OUTPUT_DIR
 import matplotlib.pyplot as plt
 
 logging.getLogger('lego-tracker').setLevel(logging.ERROR)

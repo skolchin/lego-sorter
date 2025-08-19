@@ -7,7 +7,6 @@ import cv2
 import json
 import logging
 import numpy as np
-import img_utils22 as imu
 from datetime import datetime
 from subprocess import check_output, CalledProcessError
 from typing import Iterable, Tuple, Mapping
@@ -26,14 +25,14 @@ HIST_WINDOW_SIZE = (240, 320)
 HIST_WINDOW_TITLE = 'Histogram'
 REF_WINDOW_SIZE = (240, 320)
 REF_WINDOW_TITLE = 'Ref'
-BACK_COLOR = imu.COLOR_WHITE
+BACK_COLOR = (255,255,255)
 
 def show_welcome_screen():
     """ Shows splash screen while all necessary stuff is been loaded """
     
-    frame = np.full(list(FRAME_SIZE) + [3], imu.COLOR_BLACK, np.uint8)
+    frame = np.full(list(FRAME_SIZE) + [3], (0,0,0), np.uint8)
     x,y = int(FRAME_SIZE[1]/2) - 50, int(FRAME_SIZE[0]/2) - 20
-    cv2.putText(frame, 'Loading...', (x,y), cv2.FONT_HERSHEY_SIMPLEX, .8, color=imu.COLOR_GREEN)
+    cv2.putText(frame, 'Loading...', (x,y), cv2.FONT_HERSHEY_SIMPLEX, .8, color=(0,255,0))
     cv2.imshow(FRAME_WINDOW_TITLE, frame)
 
 def show_frame(frame: np.ndarray):
@@ -47,7 +46,7 @@ def hide_frame():
 def show_roi_window(img: np.ndarray, caption: str, contour: Iterable = None, wsize: Tuple[int] = ROI_WINDOW_SIZE):
     """ Shows ROI window """
     if img is None:
-        canvas = np.full(list(wsize) + [3], imu.COLOR_GRAY, np.uint8)
+        canvas = np.full(list(wsize) + [3], (127,127,127), np.uint8)
     else:
         canvas = np.full(list(wsize) + [3], BACK_COLOR, np.uint8)
         if img.shape[0] > canvas.shape[0] or img.shape[1] > canvas.shape[1]:
@@ -111,7 +110,7 @@ def color_rect(frame: np.ndarray, bbox: Tuple[int], color: Tuple[int]):
 
 def green_rect(frame: np.ndarray, bbox: Tuple[int]):
     """ Draws green rectange """
-    color_rect(frame, bbox, imu.COLOR_GREEN)
+    color_rect(frame, bbox, (0,255,0))
 
 def red_rect(frame: np.ndarray, bbox: Tuple[int]):
     """ Draws red rectange """
@@ -131,7 +130,7 @@ def color_named_rect(frame: np.ndarray, bbox: Tuple[int], caption: str, color: T
 
 def green_named_rect(frame: np.ndarray, bbox: Tuple[int], caption: str) -> np.ndarray:
     """ Draws green rectange with caption """
-    color_named_rect(frame, bbox, caption, imu.COLOR_GREEN)
+    color_named_rect(frame, bbox, caption, (0,255,0))
 
 def red_named_rect(frame: np.ndarray, bbox: Tuple[int], caption: str) -> np.ndarray:
     """ Draws red rectange with caption """

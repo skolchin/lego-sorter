@@ -7,7 +7,7 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 
-from root_dir import OUT_DIR
+from lib.globals import OUT_DIR
 
 # import cv2
 # import img_utils22 as imu

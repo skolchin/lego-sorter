@@ -10,7 +10,7 @@ logging.basicConfig(format='%(levelname)s: %(message)s')
 logger = logging.getLogger('lego-sorter')
 
 import lib.globals
-from lib.model import (
+from lib.custom_model import (
     make_model, 
     load_model, 
     get_checkpoint_callback, 

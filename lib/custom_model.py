@@ -4,8 +4,8 @@
 # (c) lego-sorter team, 2022-2023
 
 import os
-import tensorflow as tf
 import logging
+import tensorflow as tf
 from absl import flags
 from typing import Mapping
 from lib.globals import IMAGE_SIZE, CHECKPOINT_DIR

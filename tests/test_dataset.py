@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from absl import app, flags
 from time import time
-from root_dir import ROOT_DIR
+from lib.globals import ROOT_DIR
 
 import lib.globals
 from lib.image_dataset import (
