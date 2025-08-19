@@ -1,4 +1,4 @@
-# Image processing functions package
+# Image processing functions
 # (c) kol, 2019-2022
 
 """ Misc routines """

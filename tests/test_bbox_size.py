@@ -15,7 +15,7 @@ logging.getLogger('lego-tracker').setLevel(logging.ERROR)
 from lib.pipe_utils import bgmask_to_bbox, show_frame, green_named_rect
 from lib.object_tracker import track_detect
 from lib.image_dataset import fast_get_class_names, predict_image, predict_image_probs
-from lib.custom_model import load_model, make_model
+from lib.models.base import load_model, make_model
 
 from test_static_pipe import find_bgmask_multichannel, find_bgmask_thresh
 

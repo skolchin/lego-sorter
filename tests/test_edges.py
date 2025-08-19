@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Edges detection pipeline tests
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import os
 import tensorflow as tf

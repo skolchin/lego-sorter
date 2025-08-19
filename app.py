@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Main controller app
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import sys
 import json

@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Object tracking functions
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import cv2
 import logging
@@ -12,12 +12,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, List, Callable, Tuple
 
-from .pipe_utils import bgmask_to_bbox, extract_roi
+from lib.pipe_utils import bgmask_to_bbox, extract_roi
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('var_threshold', 40, help='Background detection threshold')
 
-_logger = logging.getLogger('lego-tracker')
+_logger = logging.getLogger(__name__)
 
 class ObjectState(IntEnum):
     """ States of object being detected """

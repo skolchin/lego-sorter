@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Image processing pipeline tests
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import os
 import cv2
@@ -12,7 +12,7 @@ from absl import app, flags
 import root_dir
 from lib.globals import OUTPUT_DIR
 from lib.pipe_utils import *
-from lib.custom_model import load_model, make_model
+from lib.models.base import load_model, make_model
 from lib.image_dataset import fast_get_class_names, predict_image
 
 logging.basicConfig(format='%(levelname)s: %(message)s')

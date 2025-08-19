@@ -1,9 +1,6 @@
 # LEGO sorter project
 # Model hypertuning script
-# (c) lego-sorter team, 2022-2023
-
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+# (c) lego-sorter team, 2022-2025
 
 import optuna
 import logging
@@ -12,7 +9,7 @@ from keras.callbacks import EarlyStopping
 from optuna_integration import TFKerasPruningCallback
 
 import lib.globals
-from lib.custom_model import make_model_with_params
+from lib.models.base import make_model_with_params
 from lib.image_dataset import load_dataset, split_dataset, augment_dataset
 
 logger = logging.getLogger('lego-sorter')

@@ -1,6 +1,6 @@
 # LEGO sorter project
 # TF dataset test
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import numpy as np
 import pandas as pd

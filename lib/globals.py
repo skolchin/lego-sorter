@@ -1,26 +1,26 @@
 # LEGO sorter project
 # Global flags
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
-import os
+from pathlib import Path
 
-ROOT_DIR = os.path.abspath(os.path.join(os.path.split(__file__)[0], '..'))
+ROOT_DIR = Path(__file__).parent.parent
 """ Root dir """
 
-IMAGE_DIR = os.path.join(ROOT_DIR, 'images')
+IMAGE_DIR = ROOT_DIR / 'images'
 """ Images root """
 
-CHECKPOINT_DIR = os.path.join(ROOT_DIR, 'checkpoints')
+MODELS_DIR = ROOT_DIR / 'models'
+""" Models root """
+
+CHECKPOINT_DIR = ROOT_DIR / 'checkpoints'
 """ Checkpoints root """
 
-OUTPUT_DIR = os.path.join(ROOT_DIR, 'out')
+OUTPUT_DIR = ROOT_DIR / 'out'
 """ Output dir """
 
-RETRAIN_DIR = os.path.join(ROOT_DIR, 'retrain')
+RETRAIN_DIR = ROOT_DIR / 'retrain'
 """ Retrain images dir """
 
 BATCH_SIZE = 32
 """ Batch size """
-
-IMAGE_SIZE = (224, 224)
-""" Size of images in processing pipeline """

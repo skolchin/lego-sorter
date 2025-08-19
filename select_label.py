@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Label selection dialog
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 # This script implements TkInter label selection dialog which allows to choose
 # an image label from list of known classes.

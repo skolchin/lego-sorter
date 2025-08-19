@@ -1,13 +1,13 @@
 # LEGO sorter project
 # Debug and status info class
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import cv2
 import numpy as np
 import logging
 from typing import Iterable
 
-_logger = logging.getLogger('lego-tracker')
+_logger = logging.getLogger(__name__)
 
 class StatusInfo:
     """ Status information display helper class.

@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Pipeline support utils
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import os
 import cv2
@@ -11,10 +11,12 @@ from datetime import datetime
 from subprocess import check_output, CalledProcessError
 from typing import Iterable, Tuple, Mapping
 
-from .globals import ROOT_DIR, IMAGE_DIR, OUTPUT_DIR, RETRAIN_DIR
-from .status_info import StatusInfo
+import lib.img_utils as imu
+from lib.globals import ROOT_DIR, IMAGE_DIR, OUTPUT_DIR, RETRAIN_DIR
+from lib.status_info import StatusInfo
+from lib.models import ModelBase
 
-logger = logging.getLogger('lego-tracker')
+logger = logging.getLogger(__name__)
 
 FPS_RATE = 30
 FRAME_SIZE = (480, 640)
@@ -235,13 +237,17 @@ def plot_hist(img_list: Iterable[np.ndarray], wsize: Tuple[int], log_scale: bool
     buf = cv2.cvtColor(buf, cv2.COLOR_RGBA2BGR)
     return imu.resize(buf, wsize)
 
-def preprocess_image(frame: np.ndarray) -> np.ndarray:
+def preprocess_image(model_base: ModelBase, frame: np.ndarray) -> np.ndarray:
     """ Wrapper around image dataset `_preprocess` function to keep the picture in OpenCV format """
     from .image_dataset import _preprocess
     
     if frame is None:
         return None
-    frame = _preprocess(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))[0]
+    frame = _preprocess(
+        cv2.cvtColor(frame, cv2.COLOR_BGR2RGB),
+        preprocess_fun=model_base.preprocess_input,
+        image_size=model_base.image_size(),
+    )[0]
     if hasattr(frame, 'numpy'): frame = frame.numpy()
     return frame.astype('uint8')
 

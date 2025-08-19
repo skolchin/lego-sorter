@@ -1,11 +1,11 @@
 # LEGO sorter project
 # Dummy controller
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import logging
 from typing import Mapping
 
-_logger = logging.getLogger('lego-sorter')
+_logger = logging.getLogger(__name__)
 
 class DummyController:
     """ Dummy Controller 

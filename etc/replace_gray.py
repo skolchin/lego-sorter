@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Replace gray color from images
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import cv2
 import logging

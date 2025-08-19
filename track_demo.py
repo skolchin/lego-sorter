@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Object tracking demo
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import cv2
 import logging
@@ -13,8 +13,12 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('file', None, short_name='f', help='Process video from given file')
 flags.DEFINE_integer('camera', 0, short_name='c', help='Camera ID')
 
+logging.basicConfig(
+    format='[%(levelname).1s %(asctime)s %(name)s] %(message)s', 
+    level=logging.INFO, 
+    force=True)
+
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 
 def main(_):

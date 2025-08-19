@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Video recognition pipeline
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import os
 import cv2
@@ -9,13 +9,13 @@ from absl import app, flags
 from datetime import datetime
 
 from lib.pipe_utils import *
+from lib.models import MODEL_BASES
 from lib.globals import OUTPUT_DIR
 from lib.controller import Controller
 from lib.status_info import StatusInfo
 from lib.dummy_controller import DummyController
-from lib.custom_model import load_model, make_model
 from lib.object_tracker import track_detect, TrackObject, ObjectState, FrameCallbackReturn
-from lib.image_dataset import fast_get_class_names, predict_image, predict_image_probs
+from lib.image_dataset import predict_image, predict_image_probs
 
 FLAGS = flags.FLAGS
 flags.declare_key_flag('gray')
@@ -23,6 +23,7 @@ flags.declare_key_flag('edges')
 flags.declare_key_flag('zoom')
 
 del FLAGS.zoom_factor
+flags.DEFINE_enum('model', default='openblock', enum_values=list(MODEL_BASES.keys()), short_name='m', help='Model name')
 flags.DEFINE_float('zoom_factor', 2.2, short_name='zf', help='ROI zoom factor')
 flags.DEFINE_integer('camera', 0, short_name='c', help='Camera ID (0,1,...)')
 flags.DEFINE_string('file', None, short_name='f', help='Process video from given file')
@@ -44,12 +45,12 @@ def main(_):
     logger.setLevel(logging.DEBUG if FLAGS.debug else logging.INFO)
 
     # Load and warm up the model
-    class_names = fast_get_class_names()
-    model = make_model(len(class_names))
-    load_model(model)
+    model_base = MODEL_BASES[FLAGS.model]()
+    model = model_base.load_model()
+    class_labels = model_base.get_class_labels()
 
     frame = np.full(list(FRAME_SIZE) + [3], (0,0,0), np.uint8)
-    predict_image(model, frame, class_names)
+    predict_image(model_base, model, frame)
 
     # Initiazlize camera (either using pre-recorded file or connecting to real video cam)
     if FLAGS.file:
@@ -83,10 +84,10 @@ def main(_):
             controller = Controller()
 
     # Load reference images to display in debug mode
-    ref_images = get_ref_images(class_names)
+    ref_images = get_ref_images(class_labels)
 
     # Assign class labels to bins (letters from A to Z)
-    bins_map = {label: chr(ord('A')+n) for n, label in enumerate(class_names)}
+    bins_map = {label: chr(ord('A')+n) for n, label in enumerate(class_labels)}
 
     # Other init stuff
     frame_count = 0
@@ -124,7 +125,7 @@ def main(_):
     # Detection callback func, called to detect object on given frame
     def detect_callback(roi: np.ndarray):
         roi_rgb = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
-        preds = predict_image_probs(model, roi_rgb, class_names)
+        preds = predict_image_probs(model_base, model, roi_rgb)
         label, prob = preds[0]
         if prob < FLAGS.valid_confidence:
             return None
@@ -152,8 +153,8 @@ def main(_):
             roi_caption = f'{detection.label} ({detection.prob:.2%})'
             status_info.append(f'Detection: {roi_caption}', important=True)
             if show_preprocessed:
-                roi = preprocess_image(roi)
-                ref = preprocess_image(ref)
+                roi = preprocess_image(model_base, roi)
+                ref = preprocess_image(model_base, ref)
             if show_debug:
                 show_roi_window(roi, roi_caption)
                 show_ref_window(ref, roi_label)
@@ -247,5 +248,8 @@ def main(_):
     controller.stop_processing()
 
 if __name__ == '__main__':
-    logging.basicConfig(format='%(levelname)s: %(message)s')
+    logging.basicConfig(
+        format='[%(levelname).1s %(asctime)s %(name)s] %(message)s', 
+        level=logging.INFO, 
+        force=True)
     app.run(main)

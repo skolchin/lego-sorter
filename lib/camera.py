@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Camera object
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import cv2
 import gevent
@@ -12,7 +12,7 @@ from lib.controller import Controller
 from lib.object_tracker import TrackObject, ObjectState, track_detect
 from lib.pipe_utils import FRAME_SIZE, FPS_RATE, green_rect
 
-_logger = logging.getLogger('lego-sorter')
+_logger = logging.getLogger(__name__)
 
 
 class Camera:

@@ -19,7 +19,7 @@ from lib.image_dataset import (
     IMAGE_SIZE,
     zoom_image
 )
-from lib.custom_model import load_model, make_model
+from lib.models.base import load_model, make_model
 
 FLAGS = flags.FLAGS
 

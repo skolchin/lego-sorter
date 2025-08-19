@@ -1,6 +1,6 @@
 # LEGO sorter project
 # HW controller prototype
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import logging
 import serial
@@ -12,7 +12,7 @@ class NoSorterException(Exception):
     def __init__(self):
         super().__init__("Unable to find lego sorter. Is it connected?")
 
-_logger = logging.getLogger('lego-sorter')
+_logger = logging.getLogger(__name__)
 
 class Controller:
     """ Arduino controller. Implements singleton pattern (one instance per application) """

@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Testing various zoom functions
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import cv2
 import numpy as np

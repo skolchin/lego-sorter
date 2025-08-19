@@ -1,6 +1,6 @@
 # LEGO sorter project
 # Model training script
-# (c) lego-sorter team, 2022-2023
+# (c) lego-sorter team, 2022-2025
 
 import logging
 import matplotlib.pyplot as plt
@@ -10,7 +10,7 @@ logging.basicConfig(format='%(levelname)s: %(message)s')
 logger = logging.getLogger('lego-sorter')
 
 import lib.globals
-from lib.custom_model import (
+from lib.models.base import (
     make_model, 
     load_model, 
     get_checkpoint_callback, 
