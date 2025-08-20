@@ -5,11 +5,11 @@
 import numpy as np
 from keras.applications.mobilenet_v3 import preprocess_input
 from keras.applications import MobileNetV3Large
-from typing import ClassVar, Any
+from typing import Any
 
-from lib.models.custom import KerasModel, CustomModelBase
+from lib.models.custom import KerasModel, CustomModelProxy
 
-class MobileNetModel(CustomModelBase):
+class MobileNetModel(CustomModelProxy):
     def _model_instance(self, *args, **kwargs) -> KerasModel:
         """ Instantiate the model """
         return MobileNetV3Large(*args, **kwargs)

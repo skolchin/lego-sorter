@@ -7,9 +7,9 @@ import numpy as np
 from keras.applications.vgg19 import VGG19, preprocess_input
 from typing import Any
 
-from lib.models.custom import KerasModel, CustomModelBase
+from lib.models.custom import KerasModel, CustomModelProxy
 
-class Vgg19Model(CustomModelBase):
+class Vgg19Model(CustomModelProxy):
 
     def _model_instance(self, *args, **kwargs) -> KerasModel:
         """ Instantiate the model """

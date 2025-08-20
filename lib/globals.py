@@ -4,23 +4,23 @@
 
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).parent.parent
+ROOT_DIR: Path = Path(__file__).parent.parent
 """ Root dir """
 
-IMAGE_DIR = ROOT_DIR / 'images'
+IMAGE_DIR: Path = ROOT_DIR / 'images'
 """ Images root """
 
-MODELS_DIR = ROOT_DIR / 'models'
+MODELS_DIR: Path = ROOT_DIR / 'models'
 """ Models root """
 
-CHECKPOINT_DIR = ROOT_DIR / 'checkpoints'
+CHECKPOINT_DIR: Path = ROOT_DIR / 'checkpoints'
 """ Checkpoints root """
 
-OUTPUT_DIR = ROOT_DIR / 'out'
+OUTPUT_DIR: Path = ROOT_DIR / 'out'
 """ Output dir """
 
-RETRAIN_DIR = ROOT_DIR / 'retrain'
+RETRAIN_DIR: Path = ROOT_DIR / 'retrain'
 """ Retrain images dir """
 
-BATCH_SIZE = 32
-""" Batch size """
+BATCH_SIZE: int = 32
+""" Default batch size """

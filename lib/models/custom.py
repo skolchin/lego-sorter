@@ -9,6 +9,7 @@ import numpy as np
 import keras as K
 import tensorflow as tf
 from absl import flags
+from pathlib import Path
 from abc import abstractmethod
 from contextlib import suppress
 from keras import Model as KerasModel
@@ -18,10 +19,10 @@ from keras.callbacks import (
     ModelCheckpoint,
     ReduceLROnPlateau
 )
-from typing import Mapping, Any, Sequence, Tuple
+from typing import Mapping, Any, List, Tuple
 
 from lib.globals import CHECKPOINT_DIR, IMAGE_DIR
-from lib.models.base import ModelBase
+from lib.models.base import ModelProxy
 
 _logger = logging.getLogger(__name__)
 
@@ -46,11 +47,11 @@ flags.DEFINE_float('learning_rate', 1e-3, help='Learning rate')
 flags.DEFINE_float('momentum', 0, help='Momentum (for SGD optimizer only)')
 flags.DEFINE_float('label_smoothing', 0.01, help='Label smoothing')
 
-class CustomModelBase(ModelBase):
+class CustomModelProxy(ModelProxy):
 
     @abstractmethod
     def _model_instance(self, *args, **kwargs) -> KerasModel:
-        """ Instantiate the model """
+        """ Instantiate the actual model """
         pass
     
     def image_size(self) -> Tuple[int,int]:
@@ -147,11 +148,11 @@ class CustomModelBase(ModelBase):
         model.build([None] + list(input_shape))
         return model
 
-    def get_class_labels(self) -> Sequence[str]:
+    def get_class_labels(self) -> List[str]:
         """ Build up a list of supported class labels """
         return [f for f in os.listdir(IMAGE_DIR) if os.path.isdir(os.path.join(IMAGE_DIR, f))]
 
-    def make_model(self, fine_tuning: bool = False) -> KerasModel:
+    def make_model(self) -> KerasModel:
         """ Make and compile a Keras model with parameters defined in run-time FLAGS """
 
         num_labels = len(self.get_class_labels())
@@ -175,24 +176,28 @@ class CustomModelBase(ModelBase):
                 'learning_rate': FLAGS.learning_rate,
                 'label_smoothing': FLAGS.label_smoothing,
             },
-            fine_tuning=fine_tuning
+            fine_tuning=self._fine_tuning
         )
 
-    def load_model(self, fine_tuning: bool = False) -> KerasModel:
+    def load_from_checkpoint(self, checkpoint: str | Path | None = None) -> KerasModel:
         """ Load a model from latest checkpoint """
 
-        # Make empty model
-        model = self.make_model(fine_tuning=fine_tuning)
+        # Make an empty model
+        model = self.make_model()
 
         # Load from checkpoint
-        cp_path = self.get_checkpoint_dir()
-        cp_last = tf.train.latest_checkpoint(cp_path)
-        if not cp_last:
-            _logger.warning(f'No checkpoints found in {cp_path}')
+        if checkpoint:
+            model.load_weights(checkpoint)
         else:
-            _logger.info(f'Loading model from {cp_last}')
-            model.load_weights(cp_last)
+            cp_path = self.get_checkpoint_dir()
+            cp_last = tf.train.latest_checkpoint(cp_path)
+            if not cp_last:
+                _logger.warning(f'No checkpoints found in {cp_path}')
+            else:
+                _logger.info(f'Loading model from {cp_last}')
+                model.load_weights(cp_last)
 
+        self._model = model
         return model
 
     def get_checkpoint_dir(self) -> str:

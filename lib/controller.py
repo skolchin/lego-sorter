@@ -82,7 +82,7 @@ class Controller:
         self.change_state('M')
         _logger.info('Move state set')
 
-    def select(self, bucket: chr):
+    def select(self, bucket: str):
         self.change_state('S', bucket)
         _logger.info(f'Selection state set with bucket {bucket}')
 
@@ -110,7 +110,7 @@ class Controller:
                 arduino.write(cmd.encode('ascii'))
                 _logger.debug(f'Command sent: {cmd}')
 
-    def __decode_response(self, response: bytes) -> dict:
+    def __decode_response(self, response: bytes) -> dict | None:
         if not response:
             return None
         
@@ -144,13 +144,13 @@ class Controller:
                 
         return None
 
-    def wait_response(self, timeout: float = None) -> dict:
+    def wait_response(self, timeout: float | None = None) -> dict | None:
         try:
             return self.outbound_queue.get(block=True, timeout=timeout)
         except Empty:
             return None
 
-    def wait_state(self, state: str, timeout: float = None) -> dict:
+    def wait_state(self, state: str, timeout: float | None = None) -> dict | None:
         try:
             while (msg := self.outbound_queue.get(block=True, timeout=timeout)):
                 if msg['message_type'] == 'S' and msg['state'][0] == state[0]:
@@ -158,7 +158,7 @@ class Controller:
         except Empty:
             return None
 
-    def wait_confirmation(self, last_command: str, timeout: float = None) -> dict:
+    def wait_confirmation(self, last_command: str, timeout: float | None = None) -> dict | None:
         try:
             while (msg := self.outbound_queue.get(block=True, timeout=timeout)):
                 if msg['message_type'] == 'C' and msg['state'][0] == last_command[0]:

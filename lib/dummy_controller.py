@@ -19,12 +19,8 @@ class DummyController:
         self.port = self.find_controller()
 
     @staticmethod
-    def get_ports() -> Mapping:
-        return ['dummy']
-
-    @staticmethod
-    def find_controller():
-        return DummyController.get_ports()[0]
+    def find_controller() -> str:
+        return 'dummy'
 
     def start_processing(self):
         _logger.info("Processing started")
@@ -32,7 +28,7 @@ class DummyController:
     def stop_processing(self):
         _logger.info("Processing stopped")
 
-    def change_state(self, state: chr, bucket: chr = ''):
+    def change_state(self, state: str, bucket: str = '', confirm: bool = True):
         pass
 
     def connect(self):
@@ -47,7 +43,7 @@ class DummyController:
     def run(self):
         _logger.info('Run state set')
 
-    def select(self, bucket: chr):
+    def select(self, bucket: str):
         _logger.info(f'Selection state set with bucket {bucket}')
 
     def recognize(self):

@@ -9,7 +9,7 @@ import numpy as np
 from threading import Event, Lock, Thread
 
 from lib.controller import Controller
-from lib.object_tracker import TrackObject, ObjectState, track_detect
+from lib.object_tracker import TrackObject, ObjectState, track_detect, FrameCallbackReturn
 from lib.pipe_utils import FRAME_SIZE, FPS_RATE, green_rect
 
 _logger = logging.getLogger(__name__)
@@ -53,21 +53,22 @@ class Camera:
     def __gen_frames(self):
         """ Video thread main function """
 
-        def frame_callback(track_object: TrackObject):
+        def frame_callback(track_object: TrackObject) -> FrameCallbackReturn:
             if self.stopCameraEvent.is_set():
                 # Stop event
-                return False
+                return FrameCallbackReturn.CANCEL
 
             if track_object.state == ObjectState.NEW:
                 self.controller.recognize()
 
-            return True
+            return FrameCallbackReturn.CONTINUE
 
         def detect_callback(frame: np.ndarray):
             self.controller.select('D')
             return []
 
         _logger.debug("Starting video stream")
+        assert self.cam
         for detection in track_detect(
                 self.cam,
                 detect_callback=detect_callback,

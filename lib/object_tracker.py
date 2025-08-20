@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any, List, Callable, Tuple
 
 from lib.pipe_utils import bgmask_to_bbox, extract_roi
+from lib.img_utils import ColorT, ImageT, BBoxT
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('var_threshold', 40, help='Background detection threshold')
@@ -44,13 +45,13 @@ class FrameCallbackReturn(IntEnum):
 class TrackObject:
     """ Object tracking results """
 
-    frame: np.ndarray
+    frame: ImageT
     """ Actual frame """
 
     bgmask: Any = None
     """ Object mask (`None` if no objects found) """
 
-    bbox: Tuple[int] = None
+    bbox: BBoxT | None = None
     """ bounding box of detected object or `None` if nothing found """
 
     state: ObjectState = ObjectState.NONE
@@ -60,23 +61,23 @@ class TrackObject:
 class Detection:
     """ Detection results """
 
-    frame: np.ndarray
+    frame: ImageT
     """ Actual frame """
 
-    bbox: Tuple[int] = None
+    bbox: BBoxT | None = None
     """ ROI bbox deduced from bgmask (`None` if no objects found) """
 
-    roi: np.ndarray = None
+    roi: ImageT | None = None
     """ Region of interest (ROI) image (`None` if no objects found) """
 
-    label: str = None
+    label: str | None = None
     """ Label detected (`None` if nothing detected) """
 
-    prob: float = None
+    prob: float | None = None
     """ Detection probability (`None` if nothing detected) """
 
 
-def _init_back_sub(frame: np.ndarray):
+def _init_back_sub(frame: ImageT):
     """ Internal - make a background subtractor instance and initialize it on a frame """
     back_sub = cv2.createBackgroundSubtractorMOG2(history=200, varThreshold=FLAGS.var_threshold, detectShadows=True)
     back_sub.apply(frame, learningRate=-1)
@@ -101,9 +102,10 @@ def _max_rating_detection(detections: List[Detection]) -> Detection:
     label = max(rating, key=lambda x: rating[x])
     return detections[last_entry[label]]
 
-def track(cam: cv2.VideoCapture, 
-            replace_bg_color: Tuple[int] = None,
-            frame_callback: Callable[[TrackObject], FrameCallbackReturn] = None):
+def track(
+        cam: cv2.VideoCapture, 
+        replace_bg_color: ColorT | None = None,
+        frame_callback: Callable[[TrackObject], FrameCallbackReturn] | None = None):
     """ Detect and track an object in video stream.
 
     The function continously monitors given video stream and detects objects coming in to the vision field. 
@@ -200,11 +202,11 @@ def track(cam: cv2.VideoCapture,
 
 def track_detect(
     cam: cv2.VideoCapture, 
-    detect_callback: Callable[[np.ndarray], List],
+    detect_callback: Callable[[ImageT], List],
     track_time: float = 2.0,
-    replace_bg_color: Tuple[int] = None,
+    replace_bg_color: ColorT | None = None,
     use_rating: bool = True,
-    frame_callback: Callable[[TrackObject], FrameCallbackReturn] = None):
+    frame_callback: Callable[[TrackObject], FrameCallbackReturn] | None = None):
     """ Detects and classifies objects in a video stream.
 
     This function continously monitors given frame source, detects objects coming in to the vision field
@@ -237,7 +239,7 @@ def track_detect(
 
     detections: List[Detection] = []
     detect_start_time = 0.0
-    detection: Detection = None
+    detection: Detection | None = None
     frame_count = 0
 
     for tro in track(cam, frame_callback=frame_callback):

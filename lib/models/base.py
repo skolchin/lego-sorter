@@ -3,12 +3,37 @@
 # (c) lego-sorter team, 2022-2025
 
 import numpy as np
+from pathlib import Path
 from abc import ABC, abstractmethod
 from keras import Model as KerasModel
-from typing import Any, Sequence, Tuple
+from typing import Any, List, Tuple
 
-class ModelBase(ABC):
-    """ Base model class"""
+class ModelProxy(ABC):
+    """ Base model proxy class"""
+
+    _model: KerasModel | None
+    _fine_tuning: bool
+
+    def __init__(self, fine_tuning: bool = False):
+        self._model = None
+        self._fine_tuning = fine_tuning
+
+    @property
+    def model_class(self) -> str:
+        return self._model_class()
+
+    @property
+    def supports_training(self) -> bool:
+        return False
+
+    @property
+    def keras_model(self) -> KerasModel:
+        if self._model is not None:
+            return self._model
+        
+        m = self.make_model()
+        self._model = m
+        return m
 
     @abstractmethod
     def _model_class(self) -> str:
@@ -31,23 +56,15 @@ class ModelBase(ABC):
         pass
 
     @abstractmethod
-    def get_class_labels(self) -> Sequence[str]:
+    def get_class_labels(self) -> List[str]:
         """ Build up a list of supported class labels """
         pass
 
-    def make_model(self, fine_tuning: bool = False) -> KerasModel:
+    def make_model(self) -> KerasModel:
         """ Make and compile new Keras model """
         raise NotImplementedError('Not implemented')
     
     @abstractmethod
-    def load_model(self, fine_tuning: bool = False) -> KerasModel:
-        """ Load the model weights from latest checkpoint """
+    def load_from_checkpoint(self, checkpoint: str | Path | None = None) -> KerasModel:
+        """ Load the model weights from specified or latest checkpoint """
         pass
-
-    @property
-    def model_class(self) -> str:
-        return self._model_class()
-
-    @property
-    def supports_training(self) -> bool:
-        return False

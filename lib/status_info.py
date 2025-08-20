@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 import logging
 from typing import Iterable
+from lib.img_utils import ImageT, SizeT, COLOR_WHITE
 
 _logger = logging.getLogger(__name__)
 
@@ -42,7 +43,7 @@ class StatusInfo:
         >>> st.append('Current status')
         >>> st.show()
     """
-    def __init__(self, title: str = 'status', size: tuple = (240, 320), max_len: int = 0, max_width: int = 70):
+    def __init__(self, title: str = 'status', size: SizeT = (240, 320), max_len: int = 0, max_width: int = 70):
         self.title = title
         self.size = size
         self.max_len = max_len
@@ -117,10 +118,10 @@ class StatusInfo:
         if self.visible:
             self.show()
 
-    def _make_image(self, img: np.ndarray = None) -> np.ndarray:
+    def _make_image(self, img: ImageT | None = None) -> ImageT:
         """ Internal - apply statuses to existing image or construct new one """
         if img is None:
-            img = np.full(list(self.size) + [3], (255,255,255), np.uint8)
+            img = np.full(list(self.size) + [3], COLOR_WHITE, np.uint8)
         x, y = 10, 14
         for (status, important) in self.__status:
             clr = (0,0,255) if important else (0,255,0)
@@ -128,11 +129,11 @@ class StatusInfo:
             y += 16
         return img
 
-    def apply(self, img: np.ndarray) -> np.ndarray:
+    def apply(self, img: ImageT) -> ImageT:
         """ Apply collected statuses to the image """
         return self._make_image(img)
 
-    def assign_and_apply(self, img: np.ndarray, status: str, important: bool = False):
+    def assign_and_apply(self, img: ImageT, status: str, important: bool = False):
         """ Replaces current statuses list with given status and apply it to the image """
         self.assign([status], important)
         return self.apply(img)
